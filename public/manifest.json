@@ -1,0 +1,22 @@
+{
+  "name": "Cloud AI - Painel de Controle WhatsApp",
+  "short_name": "Cloud AI",
+  "description": "Painel de Controle e Atendimento Comercial de IA no WhatsApp",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#3b82f6",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/4712/4712010.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/4712/4712010.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
