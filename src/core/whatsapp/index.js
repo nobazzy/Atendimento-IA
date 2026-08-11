@@ -55,13 +55,22 @@ function updateSelfInfo(clientObj) {
     } catch (e) {}
 }
 
+// Remove trava SingletonLock residual do Puppeteer se existir
+try {
+    const lockPath = path.join(config.AUTH_DIR, 'session', 'SingletonLock');
+    if (fs.existsSync(lockPath)) {
+        fs.unlinkSync(lockPath);
+        console.log('🧹 [PUPPETEER] Trava SingletonLock residual removida com sucesso.');
+    }
+} catch(eLock) {}
+
 const hasAuth = fs.existsSync(config.AUTH_DIR) && fs.readdirSync(config.AUTH_DIR).length > 0;
 
 const client = new Client({
     authStrategy: new LocalAuth(),
     webVersionCache: {
         type: 'remote',
-        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1044865073-alpha.html'
+        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1044967578-alpha.html'
     },
     puppeteer: {
         headless: hasAuth,
@@ -102,32 +111,45 @@ async function processSendQueue() {
     while (sendQueue.length > 0) {
         const { targetJid, content, resolve } = sendQueue.shift();
         let sent = null;
-        try {
-            console.log(`📤 [ENVIANDO] Destino: [${targetJid}]...`);
-            sent = await withTimeout(client.sendMessage(targetJid, content), 15000);
-            console.log(`✅ [ENTREGUE] Para [${targetJid}]`);
-        } catch (sendErr) {
-            console.warn(`⚠️ Envio para [${targetJid}] falhou (${sendErr.message}).`);
-            // Fallback: Se @lid falhou, tentar @c.us mapeado
-            if (targetJid.includes('@lid')) {
-                const mapped = db.prepare("SELECT phone_jid, phone_number FROM lid_mappings WHERE lid = ?").get(targetJid);
-                let fallbackJid = null;
-                if (mapped && mapped.phone_jid && !mapped.phone_jid.startsWith('27')) {
-                    fallbackJid = mapped.phone_jid;
-                } else if (mapped && mapped.phone_number && !mapped.phone_number.startsWith('27')) {
-                    fallbackJid = `${mapped.phone_number}@c.us`;
-                }
-                if (fallbackJid) {
-                    try {
-                        console.log(`📤 [FALLBACK] Destino: [${fallbackJid}]...`);
-                        sent = await withTimeout(client.sendMessage(fallbackJid, content), 15000);
-                        console.log(`✅ [ENTREGUE VIA FALLBACK] Para [${fallbackJid}]`);
-                    } catch (fbErr) {
-                        console.error(`⚠️ Fallback [${fallbackJid}] falhou:`, fbErr.message);
+
+        // Pré-resolução de JID: se for @lid, resolver para número de telefone real @c.us ANTES de enviar
+        let destinationJid = targetJid;
+        if (targetJid.includes('@lid')) {
+            const mapped = db.prepare("SELECT phone_jid, phone_number FROM lid_mappings WHERE lid = ?").get(targetJid);
+            if (mapped && mapped.phone_jid && !mapped.phone_jid.startsWith('27')) {
+                destinationJid = mapped.phone_jid;
+            } else if (mapped && mapped.phone_number && !mapped.phone_number.startsWith('27')) {
+                destinationJid = `${mapped.phone_number}@c.us`;
+            } else {
+                try {
+                    const c = await withTimeout(client.getContactById(targetJid), 3000).catch(() => null);
+                    if (c && c.number && !c.number.startsWith('27')) {
+                        const cleanN = c.number.replace(/\D/g, '');
+                        if (cleanN.length >= 10) {
+                            destinationJid = `${cleanN}@c.us`;
+                            saveLidMapping(targetJid, destinationJid, c.name || c.pushname || '');
+                        }
                     }
+                } catch (eC) {}
+            }
+        }
+
+        try {
+            console.log(`📤 [ENVIANDO RESPOSTA DA IA] Destino: [${destinationJid}]...`);
+            sent = await withTimeout(client.sendMessage(destinationJid, content), 15000);
+            console.log(`✅ [MENSAGEM ENTREGUE COM SUCESSO] Para [${destinationJid}]`);
+        } catch (sendErr) {
+            console.warn(`⚠️ Envio para [${destinationJid}] falhou (${sendErr.message}). Tentando targetJid original [${targetJid}]...`);
+            if (destinationJid !== targetJid) {
+                try {
+                    sent = await withTimeout(client.sendMessage(targetJid, content), 15000);
+                    console.log(`✅ [ENTREGUE VIA TARGET JID ORIGINAL] Para [${targetJid}]`);
+                } catch (err2) {
+                    console.error(`⚠️ Fallback para [${targetJid}] falhou:`, err2.message);
                 }
             }
         }
+
         if (sent && sent.id && sent.id.id) {
             botSentMsgIds.add(sent.id.id);
             if (botSentMsgIds.size > 1000) {
@@ -136,8 +158,7 @@ async function processSendQueue() {
             }
         }
         resolve(sent);
-        // Aguardar 1s entre envios para não sobrecarregar o Puppeteer
-        await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, 500));
     }
     isSending = false;
 }
@@ -587,10 +608,9 @@ async function handleIncomingOrCreatedMessage(msg) {
             }
         }
 
-        // GUARDA DE INICIALIZAÇÃO: Ignorar mensagens antigas que o WhatsApp re-entrega do cache ao reconectar
+        // GUARDA DE INICIALIZAÇÃO: Ignorar apenas mensagens realmente antigas (mais de 12 horas atrás)
         const msgTimestamp = msg.timestamp ? (msg.timestamp * 1000) : 0;
-        if (msgTimestamp > 0 && msgTimestamp < (startupTimestamp - 30000)) {
-            // Mensagem anterior ao startup (com 30s de margem) - ignorar silenciosamente
+        if (msgTimestamp > 0 && msgTimestamp < (startupTimestamp - 43200000)) {
             return;
         }
 

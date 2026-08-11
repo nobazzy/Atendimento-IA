@@ -46,13 +46,6 @@ cp .env.example .env
 Edite o arquivo `.env` e insira as credenciais de API desejadas e o numero do WhatsApp responsavel.
 
 ### 4. Iniciar a Aplicacao
-
-**No Windows (Duplo Clique):**
-Você pode simplesmente dar um duplo clique no arquivo executavel batch:
-- **`iniciar_minha_ia.bat`**: Inicia o servidor Node.js e abre automaticamente o painel web no navegador.
-- **`abrir_painel_web.bat`**: Atalho para abrir o painel web no navegador.
-
-**Via Linha de Comando (Qualquer Sistema):**
 ```bash
 npm start
 ```

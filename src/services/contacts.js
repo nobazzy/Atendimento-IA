@@ -414,8 +414,26 @@ function toggleManualOverride(chatId, pause = true, user = 'Alex') {
 function isManualOverrideActive(chatId) {
     try {
         const sChatId = sanitizeInput(chatId);
+        if (!sChatId) return false;
+
+        // O chat próprio do Alex (Você / @nobazzy) NUNCA é bloqueado por atendimento manual
+        const cleanMyNum = config.MY_NUMBER ? config.MY_NUMBER.replace(/\D/g, '') : '';
+        const cleanChat = sChatId.replace(/\D/g, '');
+        if (sChatId === '272653298487378@lid' || sChatId === '5511935855321@c.us' || (cleanMyNum && cleanChat === cleanMyNum)) {
+            return false;
+        }
+
         const row = db.prepare('SELECT paused FROM manual_override WHERE chat_id = ?').get(sChatId);
-        return Boolean(row && row.paused === 1);
+        if (row && row.paused === 1) return true;
+
+        if (sChatId.includes('@lid')) {
+            const mapped = db.prepare('SELECT phone_jid FROM lid_mappings WHERE lid = ?').get(sChatId);
+            if (mapped && mapped.phone_jid) {
+                const mRow = db.prepare('SELECT paused FROM manual_override WHERE chat_id = ?').get(mapped.phone_jid);
+                if (mRow && mRow.paused === 1) return true;
+            }
+        }
+        return false;
     } catch (e) {
         return false;
     }
