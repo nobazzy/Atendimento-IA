@@ -72,6 +72,7 @@ function createServer() {
         });
     });
 
+
     // ─── MARKETPLACE DE PROMPTS ───
     app.get('/api/templates', (req, res) => {
         res.json({ success: true, templates: getPromptTemplates() });

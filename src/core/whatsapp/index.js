@@ -20,9 +20,12 @@ if (fs.existsSync(config.SELF_JIDS_PATH)) {
     try {
         const raw = fs.readFileSync(config.SELF_JIDS_PATH, 'utf8');
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) parsed.forEach(j => selfJids.add(j));
+        if (Array.isArray(parsed)) {
+            parsed.forEach(jid => selfJids.add(jid));
+        }
     } catch (e) {}
 }
+
 if (config.MY_NUMBER) {
     const cleanMyNum = config.MY_NUMBER.replace(/\D/g, '');
     if (cleanMyNum) {
@@ -32,48 +35,151 @@ if (config.MY_NUMBER) {
     }
 }
 
-function updateSelfInfo(clientObj) {
+async function updateSelfInfo(clientObj) {
     try {
         if (clientObj && clientObj.info && clientObj.info.wid) {
             const widObj = clientObj.info.wid;
             if (widObj.user) {
                 selfJids.add(`${widObj.user}@c.us`);
-                selfJids.add(`${widObj.user}@lid`);
                 selfJids.add(widObj.user);
             }
             if (widObj._serialized) selfJids.add(widObj._serialized);
+
+            // Buscar nosso próprio LID usando o getContactById oficial
+            try {
+                const meContact = await clientObj.getContactById(widObj._serialized);
+                if (meContact) {
+                    let myLid = '';
+                    if (meContact.lid && (meContact.lid._serialized || typeof meContact.lid === 'string')) {
+                        myLid = meContact.lid._serialized || meContact.lid;
+                    } else if (meContact.id && meContact.id.lid) {
+                        myLid = meContact.id.lid._serialized || meContact.id.lid;
+                    }
+                    if (myLid && myLid.includes('@lid')) {
+                        selfJids.add(myLid);
+                        console.log(`🔑 [SELF LID RESOLVED FROM CONTACT] ${myLid}`);
+                    }
+                }
+            } catch (errMe) {
+                console.warn('⚠️ Erro ao obter próprio LID via getContactById:', errMe.message);
+            }
         }
         if (config.MY_NUMBER) {
             const clean = config.MY_NUMBER.replace(/\D/g, '');
             if (clean) {
                 selfJids.add(`${clean}@c.us`);
-                selfJids.add(`${clean}@lid`);
                 selfJids.add(clean);
             }
         }
+
+        // Tentar também obter o LID via Puppeteer como fallback
+        if (clientObj && clientObj.pupPage) {
+            try {
+                const myLid = await clientObj.pupPage.evaluate(() => {
+                    try {
+                        if (window.Store && window.Store.User && window.Store.User.getMeUser) {
+                            const me = window.Store.User.getMeUser();
+                            if (me && me.id && me.id._serialized) return me.id._serialized;
+                        }
+                        if (window.Store && window.Store.Conn && window.Store.Conn.wid) {
+                            const conn = window.Store.Conn;
+                            if (conn.wid && conn.wid._serialized && conn.wid._serialized.includes('@lid')) {
+                                return conn.wid._serialized;
+                            }
+                        }
+                    } catch(e) {}
+                    return null;
+                });
+                if (myLid && myLid.includes('@lid')) {
+                    selfJids.add(myLid);
+                    console.log(`🔑 [SELF LID RESOLVED FROM PUPPETEER FALLBACK] ${myLid}`);
+                }
+            } catch (eEval) {}
+        }
+
         fs.writeFileSync(config.SELF_JIDS_PATH, JSON.stringify(Array.from(selfJids), null, 2), 'utf8');
+        console.log(`📋 [SELF JIDS ATUALIZADOS] ${JSON.stringify(Array.from(selfJids))}`);
     } catch (e) {}
 }
 
-// Remove trava SingletonLock residual do Puppeteer se existir
-try {
-    const lockPath = path.join(config.AUTH_DIR, 'session', 'SingletonLock');
-    if (fs.existsSync(lockPath)) {
-        fs.unlinkSync(lockPath);
-        console.log('🧹 [PUPPETEER] Trava SingletonLock residual removida com sucesso.');
-    }
-} catch(eLock) {}
+// ─── GERENCIADOR E LIMPADOR INTELIGENTE DE CACHE (Evita travamentos e mantém a sessão ativa) ───
+function cleanAuthSession() {
+    const authDir = config.AUTH_DIR;
+    const cacheDir = path.join(path.dirname(authDir), '.wwebjs_cache');
+    
+    // Se a variável FRESH_SESSION for 'true', faz limpeza total. Caso contrário, faz limpeza inteligente mantendo o login.
+    const forceFreshStart = process.env.FRESH_SESSION === 'true';
 
-const hasAuth = fs.existsSync(config.AUTH_DIR) && fs.readdirSync(config.AUTH_DIR).length > 0;
+    if (forceFreshStart) {
+        console.log('🧹 [FRESH START] Forçando limpeza TOTAL da sessão. QR Code será exigido.');
+        try {
+            if (fs.existsSync(authDir)) {
+                fs.rmSync(authDir, { recursive: true, force: true });
+                console.log('🧹 [FRESH START] Pasta .wwebjs_auth removida com sucesso.');
+            }
+        } catch (e) {
+            console.warn('⚠️ Não foi possível remover .wwebjs_auth:', e.message);
+        }
+    } else {
+        console.log('🧹 [SMART CACHE] Preservando arquivos de login. Limpando lixo e travas para evitar corrupção...');
+        // Mantém a pasta "session/Default" (com as credenciais), mas limpa tudo o que acumula lixo ou trava o Chrome
+        try {
+            if (fs.existsSync(authDir)) {
+                const defaultDir = path.join(authDir, 'session', 'Default');
+                if (fs.existsSync(defaultDir)) {
+                    const pathsToClean = [
+                        path.join(defaultDir, 'Cache'),
+                        path.join(defaultDir, 'Code Cache'),
+                        path.join(defaultDir, 'Service Worker'),
+                        path.join(defaultDir, 'Storage'),
+                        path.join(defaultDir, 'SingletonLock')
+                    ];
+                    for (const p of pathsToClean) {
+                        if (fs.existsSync(p)) {
+                            fs.rmSync(p, { recursive: true, force: true });
+                            console.log(`🧹 [SMART CACHE] Pasta limpa: ${path.basename(p)}`);
+                        }
+                    }
+                }
+                
+                // Remover trava residual SingletonLock se houver na pasta session
+                const lockPath = path.join(authDir, 'session', 'SingletonLock');
+                if (fs.existsSync(lockPath)) {
+                    fs.unlinkSync(lockPath);
+                    console.log('🧹 [PUPPETEER] Trava SingletonLock residual removida.');
+                }
+            }
+        } catch (e) {
+            console.warn('⚠️ Erro na limpeza inteligente do Puppeteer:', e.message);
+        }
+    }
+
+    // Limpar .wwebjs_cache que vive acumulando e quebrando o WhatsApp Web
+    try {
+        if (fs.existsSync(cacheDir)) {
+            fs.rmSync(cacheDir, { recursive: true, force: true });
+            console.log('🧹 [SMART CACHE] Cache temporário (.wwebjs_cache) removido com sucesso.');
+        }
+    } catch (e) {
+        console.warn('⚠️ Não foi possível limpar .wwebjs_cache:', e.message);
+    }
+}
+
+// Executar limpeza inteligente antes de inicializar o client
+cleanAuthSession();
+
+// Determinar se já possui sessão salva
+const hasSessionSaved = fs.existsSync(config.AUTH_DIR) && fs.existsSync(path.join(config.AUTH_DIR, 'session', 'Default'));
+if (hasSessionSaved && process.env.FRESH_SESSION !== 'true') {
+    console.log('📲 [WHATSAPP] Carregando sessão existente de forma segura (limpeza inteligente aplicada)...\n');
+} else {
+    console.log('📲 [WHATSAPP] Nova sessão limpa! Aguardando geração de QR Code...\n');
+}
 
 const client = new Client({
     authStrategy: new LocalAuth(),
-    webVersionCache: {
-        type: 'remote',
-        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1044967578-alpha.html'
-    },
     puppeteer: {
-        headless: hasAuth,
+        headless: false,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -82,6 +188,11 @@ const client = new Client({
             '--no-first-run',
             '--no-zygote',
             '--disable-gpu',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+            '--disable-ipc-flooding-protection',
+            '--disable-features=CalculateNativeWinOcclusion,IsolateOrigins,site-per-process',
             '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
         ]
     }
@@ -116,38 +227,35 @@ async function processSendQueue() {
         let destinationJid = targetJid;
         if (targetJid.includes('@lid')) {
             const mapped = db.prepare("SELECT phone_jid, phone_number FROM lid_mappings WHERE lid = ?").get(targetJid);
-            if (mapped && mapped.phone_jid && !mapped.phone_jid.startsWith('27')) {
+            if (mapped && mapped.phone_jid && mapped.phone_jid !== '@c.us') {
                 destinationJid = mapped.phone_jid;
-            } else if (mapped && mapped.phone_number && !mapped.phone_number.startsWith('27')) {
+            } else if (mapped && mapped.phone_number && mapped.phone_number.length >= 10 && mapped.phone_number.length <= 13) {
                 destinationJid = `${mapped.phone_number}@c.us`;
             } else {
+                // LID sem mapeamento no banco - tentar resolver rapidamente via API
                 try {
-                    const c = await withTimeout(client.getContactById(targetJid), 3000).catch(() => null);
-                    if (c && c.number && !c.number.startsWith('27')) {
+                    const c = await withTimeout(client.getContactById(targetJid), 2000).catch(() => null);
+                    if (c && c.number) {
                         const cleanN = c.number.replace(/\D/g, '');
-                        if (cleanN.length >= 10) {
+                        if (cleanN.length >= 10 && cleanN.length <= 13) {
                             destinationJid = `${cleanN}@c.us`;
                             saveLidMapping(targetJid, destinationJid, c.name || c.pushname || '');
                         }
                     }
                 } catch (eC) {}
+
+                if (destinationJid.includes('@lid')) {
+                    console.log(`ℹ️ [LID DIRECT] Não foi possível mapear o LID [${targetJid}] para telefone. Enviando resposta diretamente para o LID.`);
+                }
             }
         }
 
         try {
             console.log(`📤 [ENVIANDO RESPOSTA DA IA] Destino: [${destinationJid}]...`);
-            sent = await withTimeout(client.sendMessage(destinationJid, content), 15000);
+            sent = await withTimeout(client.sendMessage(destinationJid, content), 8000);
             console.log(`✅ [MENSAGEM ENTREGUE COM SUCESSO] Para [${destinationJid}]`);
         } catch (sendErr) {
-            console.warn(`⚠️ Envio para [${destinationJid}] falhou (${sendErr.message}). Tentando targetJid original [${targetJid}]...`);
-            if (destinationJid !== targetJid) {
-                try {
-                    sent = await withTimeout(client.sendMessage(targetJid, content), 15000);
-                    console.log(`✅ [ENTREGUE VIA TARGET JID ORIGINAL] Para [${targetJid}]`);
-                } catch (err2) {
-                    console.error(`⚠️ Fallback para [${targetJid}] falhou:`, err2.message);
-                }
-            }
+            console.warn(`⚠️ Envio para [${destinationJid}] falhou (${sendErr.message}).`);
         }
 
         if (sent && sent.id && sent.id.id) {
@@ -195,6 +303,55 @@ function isHumanName(str) {
     if (cleanDigits.length >= 6) return false;
     if (/^[\d\s\+\-\@\._]+$/.test(str)) return false;
     return true;
+}
+
+async function isLidMe(lid) {
+    if (!lid || !lid.includes('@lid')) return false;
+    if (selfJids.has(lid)) return true;
+
+    // Verificar no arquivo self_jids.json local
+    if (fs.existsSync(config.SELF_JIDS_PATH)) {
+        try {
+            const raw = fs.readFileSync(config.SELF_JIDS_PATH, 'utf8');
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.includes(lid)) {
+                selfJids.add(lid);
+                return true;
+            }
+        } catch(e) {}
+    }
+
+    // Verificar mapeamento existente na base SQLite
+    try {
+        const mapped = db.prepare("SELECT phone_jid, phone_number FROM lid_mappings WHERE lid = ?").get(lid);
+        const myNum = config.MY_NUMBER ? config.MY_NUMBER.replace(/\D/g, '') : '';
+        if (mapped) {
+            const phone = (mapped.phone_jid || mapped.phone_number || '').replace(/\D/g, '');
+            if (phone && phone === myNum) {
+                selfJids.add(lid);
+                fs.writeFileSync(config.SELF_JIDS_PATH, JSON.stringify(Array.from(selfJids), null, 2), 'utf8');
+                console.log(`🔑 [isLidMe] LID [${lid}] mapeado no SQLite como nosso próprio número.`);
+                return true;
+            }
+        }
+    } catch(e) {}
+
+    // Resolver remotamente via API getContactById
+    try {
+        const contact = await client.getContactById(lid).catch(() => null);
+        if (contact && contact.number) {
+            const cleanNum = contact.number.replace(/\D/g, '');
+            const myNum = config.MY_NUMBER ? config.MY_NUMBER.replace(/\D/g, '') : '';
+            if (cleanNum && cleanNum === myNum) {
+                selfJids.add(lid);
+                fs.writeFileSync(config.SELF_JIDS_PATH, JSON.stringify(Array.from(selfJids), null, 2), 'utf8');
+                console.log(`🔑 [isLidMe] LID [${lid}] resolvido e confirmado como nosso próprio número via WhatsApp API.`);
+                return true;
+            }
+        }
+    } catch(e) {}
+
+    return false;
 }
 
 function checkIsSelf(msg, clientObj = client, selfJidsSet = selfJids) {
@@ -439,13 +596,9 @@ client.on('disconnected', (reason) => {
 client.on('ready', async () => {
     isReady = true;
     startupTimestamp = Date.now(); // Marca o momento exato que o WhatsApp ficou pronto
-    updateSelfInfo(client);
-    console.log(`\n🟢 WHATSAPP CONECTADO COM SUCESSO! (timestamp: ${startupTimestamp})`);
+    await updateSelfInfo(client);
+    console.log(`\n🟢 WHATSAPP CONECTADO E PRONTO PARA ATENDIMENTO! (timestamp: ${startupTimestamp})`);
     broadcastLog('system', 'WhatsApp Conectado', `Cliente pronto no celular ${config.MY_NUMBER || ''}`, '🟢');
-    
-    setTimeout(() => {
-        syncWhatsAppContacts();
-    }, 5000);
 });
 
 async function syncWhatsAppContacts() {
@@ -595,9 +748,30 @@ async function syncWhatsAppContacts() {
 
 const processedMsgIds = new Set();
 
-async function handleIncomingOrCreatedMessage(msg) {
+async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
     try {
-        if (!msg || !msg.id) return;
+        if (!msg || !msg.id) {
+            return;
+        }
+
+        // ─── FILTRO DE MENSAGENS ANTIGAS (ignora histórico carregado na sincronização) ───
+        const msgTimestamp = msg.timestamp ? msg.timestamp * 1000 : 0;
+        if (msgTimestamp > 0 && msgTimestamp < startupTimestamp) {
+            return; // Mensagem anterior ao boot - ignorar silenciosamente
+        }
+
+        // Logar apenas mensagens novas e válidas recebidas pós-boot
+        console.log(`📥 [EVENT: ${eventType}] de=${msg.from} | fromMe=${msg.fromMe} | body="${(msg.body || '').substring(0, 40)}"`);
+
+        let body = (msg.body || '').trim();
+        if (!body && msg.hasMedia) {
+            body = '[Mídia recebida do contato]';
+        }
+        if (!body) {
+            console.log(`ℹ️ [DEBUG] Mensagem vazia/descriptografando (body vazio). Ignorando deduplicação temporariamente para reprocessar depois.`);
+            return;
+        }
+
         const msgIdStr = (msg.id && (msg.id._serialized || msg.id.id)) ? (msg.id._serialized || msg.id.id) : null;
         if (msgIdStr) {
             if (processedMsgIds.has(msgIdStr)) return;
@@ -606,12 +780,6 @@ async function handleIncomingOrCreatedMessage(msg) {
                 const first = processedMsgIds.values().next().value;
                 processedMsgIds.delete(first);
             }
-        }
-
-        // GUARDA DE INICIALIZAÇÃO: Ignorar apenas mensagens realmente antigas (mais de 12 horas atrás)
-        const msgTimestamp = msg.timestamp ? (msg.timestamp * 1000) : 0;
-        if (msgTimestamp > 0 && msgTimestamp < (startupTimestamp - 43200000)) {
-            return;
         }
 
         // ──── CAPTURA DE LID (NÃO-BLOQUEANTE - Roda em segundo plano sem travar a resposta da IA) ────
@@ -647,22 +815,23 @@ async function handleIncomingOrCreatedMessage(msg) {
             }, 100);
         }
 
-        let body = (msg.body || '').trim();
-        if (!body && msg.hasMedia) {
-            body = '[Mídia recebida do contato]';
+        // ─── AUTO-DETECÇÃO DO LID PRÓPRIO (ANTES do checkIsSelf) ───
+        if (msg.from && msg.from.includes('@lid') && !selfJids.has(msg.from)) {
+            await isLidMe(msg.from);
         }
-        if (!body) return;
+        if (msg.to && msg.to.includes('@lid') && !selfJids.has(msg.to)) {
+            await isLidMe(msg.to);
+        }
+
+        const isSelf = checkIsSelf(msg, client, selfJids);
+        const currentChatJid = (msg.id && msg.id.remote) ? msg.id.remote : (msg.fromMe ? msg.to : msg.from);
+
+        console.log(`━━━━ FLUXO ━━━━ fromMe=${msg.fromMe} | isSelf=${isSelf} | chatJid=${currentChatJid}`);
 
         if (msg.from === 'status@broadcast' || msg.to === 'status@broadcast' || msg.isStatus) return;
         if ((msg.from && msg.from.includes('@g.us')) || (msg.to && msg.to.includes('@g.us'))) return;
 
         console.log(`📩 [MSG DETECTADA] fromMe=${msg.fromMe} | from=${msg.from} | to=${msg.to} | body="${body.substring(0, 35)}"`);
-
-        const isSelf = checkIsSelf(msg, client, selfJids);
-        if (isSelf && msg.fromMe && msg.from) {
-            selfJids.add(msg.from);
-        }
-        const currentChatJid = (msg.id && msg.id.remote) ? msg.id.remote : (msg.fromMe ? msg.to : msg.from);
 
         // ─── 1. MENSAGENS ENVIADAS PELO PRÓPRIO ALEX (msg.fromMe === true) ───
         if (msg.fromMe) {
@@ -995,7 +1164,14 @@ async function handleIncomingOrCreatedMessage(msg) {
     }
 }
 
-client.on('message_create', handleIncomingOrCreatedMessage);
+// Eventos do WhatsApp (escuta mensagens recebidas e criadas com deduplicação)
+client.on('message', (msg) => {
+    handleIncomingOrCreatedMessage(msg, 'message');
+});
+
+client.on('message_create', (msg) => {
+    handleIncomingOrCreatedMessage(msg, 'message_create');
+});
 
 async function resolveSingleLid(targetJidOrNumber) {
     try {

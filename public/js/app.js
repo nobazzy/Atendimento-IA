@@ -135,6 +135,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
+                // Atualizar pílulas de status de saúde no topo do cabeçalho
+                const pillsContainer = document.getElementById('health-pills-container');
+                if (pillsContainer && data.health) {
+                    const nodeOk = data.health.node && data.health.node.status.includes('🟢');
+                    const waOk = data.health.whatsapp && data.health.whatsapp.status.includes('🟢');
+                    const aiOk = data.health.openai && data.health.openai.status.includes('🟢');
+
+                    pillsContainer.innerHTML = `
+                        <div class="pill"><span class="status-dot ${nodeOk ? '' : 'red'}"></span> Node</div>
+                        <div class="pill"><span class="status-dot ${waOk ? '' : 'red'}"></span> WhatsApp</div>
+                        <div class="pill"><span class="status-dot ${aiOk ? '' : 'red'}"></span> Multi-LLM</div>
+                    `;
+                }
+
                 // Telemetria da IA no Dashboard
                 try {
                     const nocRes = await fetch('/api/noc/status');
@@ -278,7 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 addLogRow(data);
                 // Atualização em tempo real do front-end
-                if (data.type === 'chat' || data.type === 'ai') {
+                if (data.type === 'chat' || data.type === 'ai' || data.type === 'system') {
                     if (typeof loadChats === 'function') loadChats();
                     if (currentActiveChat && typeof selectChat === 'function') {
                         selectChat(currentActiveChat, currentActiveChat);

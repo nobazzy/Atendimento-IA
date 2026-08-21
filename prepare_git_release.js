@@ -19,7 +19,8 @@ const ignoreList = [
     'database.sqlite-wal',
     'database.sqlite-shm',
     '.env',
-    'self_jids.json'
+    'self_jids.json',
+    'discord-ai-assistant'
 ];
 
 function copyRecursiveSync(src, dest) {
