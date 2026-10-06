@@ -24,21 +24,40 @@ if %errorlevel% neq 0 (
 if not exist ".env" (
     echo [INFO] Arquivo .env não encontrado. Criando cópia inicial a partir de .env.example...
     copy .env.example .env >nul
-    echo [AVISO] O arquivo .env foi criado. Configure suas chaves de API nele se desejar.
+    echo [AVISO] O arquivo .env foi gerado. Configure suas chaves de API nele se desejar.
     echo.
 )
 
-:: 3. Verificar dependências (node_modules)
-if not exist "node_modules\" (
-    echo [INFO] Instalando dependências do projeto (npm install)...
-    echo Isso pode levar alguns minutos na primeira execução.
-    call npm install
+:: 3. Detecção e instalação automática de dependências (npm install)
+set "NEED_INSTALL=0"
+if not exist "node_modules\" set "NEED_INSTALL=1"
+if not exist "node_modules\dotenv\" set "NEED_INSTALL=1"
+if not exist "node_modules\express\" set "NEED_INSTALL=1"
+if not exist "node_modules\whatsapp-web.js\" set "NEED_INSTALL=1"
+
+if "%NEED_INSTALL%"=="1" (
+    echo ======================================================================
+    echo [INFO] Dependências não encontradas ou incompletas.
+    echo [INFO] Executando instalação automática das dependências (npm install)...
+    echo Isso pode levar de 1 a 2 minutos na primeira execução.
+    echo ======================================================================
+    echo.
+    where npm.cmd >nul 2>nul
+    if %errorlevel% equ 0 (
+        call npm.cmd install
+    ) else (
+        call npm install
+    )
     if %errorlevel% neq 0 (
-        echo [ERRO] Falha ao instalar dependências via npm install.
+        echo.
+        echo [ERRO] Falha ao instalar as dependências do projeto via npm.
+        echo Verifique sua conexão com a internet e permissões de pasta.
+        echo.
         pause
         exit /b 1
     )
-    echo [OK] Dependências instaladas com sucesso!
+    echo.
+    echo [OK] Todas as dependências foram instaladas com sucesso!
     echo.
 )
 
