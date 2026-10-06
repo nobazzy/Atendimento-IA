@@ -168,13 +168,30 @@ function initDatabase() {
             CREATE TABLE IF NOT EXISTS knowledge_docs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
-                type TEXT NOT NULL, -- 'pdf', 'txt', 'url'
-                content TEXT NOT NULL,
+                filename TEXT DEFAULT '',
+                type TEXT NOT NULL, -- 'pdf', 'docx', 'xlsx', 'csv', 'txt', 'url'
+                content TEXT DEFAULT '',
+                file_path TEXT DEFAULT '',
+                file_size INTEGER DEFAULT 0,
+                chunk_count INTEGER DEFAULT 0,
+                keywords TEXT DEFAULT '',
                 source TEXT DEFAULT '',
                 company_id TEXT DEFAULT 'default',
                 active INTEGER DEFAULT 1,
                 created_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS knowledge_chunks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                doc_id INTEGER NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                metadata TEXT DEFAULT '{}',
+                company_id TEXT DEFAULT 'default',
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_chunks_doc_id ON knowledge_chunks(doc_id);
+            CREATE INDEX IF NOT EXISTS idx_chunks_company ON knowledge_chunks(company_id);
 
             -- MARKETPLACE DE TEMPLATES DE PROMPT POR NICHO
             CREATE TABLE IF NOT EXISTS prompt_templates (
@@ -208,6 +225,27 @@ function initDatabase() {
         try { db.exec("ALTER TABLE lid_mappings ADD COLUMN phone_number TEXT DEFAULT '';"); } catch (e) {}
         try { db.exec("ALTER TABLE personalities ADD COLUMN company_id TEXT DEFAULT 'default';"); } catch (e) {}
         try { db.exec("ALTER TABLE chat_history ADD COLUMN company_id TEXT DEFAULT 'default';"); } catch (e) {}
+        try { db.exec("ALTER TABLE system_config ADD COLUMN company_id TEXT DEFAULT 'default';"); } catch (e) {}
+        try { db.exec("ALTER TABLE knowledge_docs ADD COLUMN filename TEXT DEFAULT '';"); } catch (e) {}
+        try { db.exec("ALTER TABLE knowledge_docs ADD COLUMN file_path TEXT DEFAULT '';"); } catch (e) {}
+        try { db.exec("ALTER TABLE knowledge_docs ADD COLUMN file_size INTEGER DEFAULT 0;"); } catch (e) {}
+        try { db.exec("ALTER TABLE knowledge_docs ADD COLUMN chunk_count INTEGER DEFAULT 0;"); } catch (e) {}
+        try { db.exec("ALTER TABLE knowledge_docs ADD COLUMN keywords TEXT DEFAULT '';"); } catch (e) {}
+        try {
+            db.exec(`
+                CREATE TABLE IF NOT EXISTS knowledge_chunks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    doc_id INTEGER NOT NULL,
+                    chunk_index INTEGER NOT NULL,
+                    content TEXT NOT NULL,
+                    metadata TEXT DEFAULT '{}',
+                    company_id TEXT DEFAULT 'default',
+                    created_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_chunks_doc_id ON knowledge_chunks(doc_id);
+                CREATE INDEX IF NOT EXISTS idx_chunks_company ON knowledge_chunks(company_id);
+            `);
+        } catch (e) {}
 
         // Seed default company
         const checkCo = db.prepare("SELECT COUNT(*) as count FROM companies").get();

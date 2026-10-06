@@ -12,7 +12,7 @@ function getProfileData() {
     }
 }
 
-function setProfileValue(key, value, user = 'Alex') {
+function setProfileValue(key, value, user = 'Admin') {
     try {
         const sKey = sanitizeInput(key).toLowerCase();
         const sVal = sanitizeInput(value);
@@ -32,7 +32,7 @@ function setProfileValue(key, value, user = 'Alex') {
     }
 }
 
-function deleteProfileValue(key, user = 'Alex') {
+function deleteProfileValue(key, user = 'Admin') {
     try {
         const sKey = sanitizeInput(key).toLowerCase();
         db.prepare('DELETE FROM user_profile WHERE key = ?').run(sKey);
@@ -53,7 +53,7 @@ function getMemories() {
     }
 }
 
-function addMemory(category, fact, user = 'Alex') {
+function addMemory(category, fact, user = 'Admin') {
     try {
         const sCat = sanitizeInput(category).toLowerCase() || 'geral';
         const sFact = sanitizeInput(fact);
@@ -70,7 +70,7 @@ function addMemory(category, fact, user = 'Alex') {
     }
 }
 
-function updateMemory(id, category, fact, user = 'Alex') {
+function updateMemory(id, category, fact, user = 'Admin') {
     try {
         const sCat = sanitizeInput(category).toLowerCase() || 'geral';
         const sFact = sanitizeInput(fact);
@@ -84,7 +84,7 @@ function updateMemory(id, category, fact, user = 'Alex') {
     }
 }
 
-function deleteMemory(id, user = 'Alex') {
+function deleteMemory(id, user = 'Admin') {
     try {
         db.prepare('DELETE FROM memories WHERE id = ?').run(id);
         addAuditLog(user, 'Apagou Memória', `ID: ${id}`, '🔴');

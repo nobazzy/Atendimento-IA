@@ -1,4 +1,4 @@
-# Dependências
+# Dependências do Node.js
 node_modules/
 
 # Autenticação e Sessão do WhatsApp (SEGURANÇA: NUNCA SUBIR PRO GITHUB!)
@@ -6,22 +6,32 @@ node_modules/
 .wwebjs_cache/
 self_jids.json
 
-# Banco de Dados SQLite Local e Backups
+# Banco de Dados SQLite Local e Backups (SEGURANÇA: NUNCA SUBIR PRO GITHUB!)
 database.sqlite
 database.sqlite-wal
 database.sqlite-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
 backups/
 
-# Variáveis de Ambiente com API Keys (SEGURANÇA!)
+# Variáveis de Ambiente e Chaves de API (SEGURANÇA!)
 .env
 .env.local
 *.env
+!.env.example
+
+# Uploads locais de RAG (exceto .gitkeep)
+uploads/*
+!uploads/rag/
+uploads/rag/*
+!uploads/rag/.gitkeep
 
 # Logs do Sistema
 *.log
 npm-debug.log*
 
-# IDE e Sistema Operacional
+# Arquivos de IDE e Sistema Operacional
 .DS_Store
 Thumbs.db
 .vscode/

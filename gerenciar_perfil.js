@@ -10,7 +10,7 @@ function showMenu() {
     console.log("\n========================================================");
     console.log("🛠️ GERENCIADOR COMPLETO DO BANCO DE DADOS (SQLITE)");
     console.log("========================================================");
-    console.log("1. Ver perfil do Alex");
+    console.log("1. Ver perfil do Administrador");
     console.log("2. Adicionar/Atualizar informação do perfil");
     console.log("3. Ver memórias de longo prazo");
     console.log("4. Adicionar nova memória/fato");
@@ -27,7 +27,7 @@ function showMenu() {
 function handleMenu(option) {
     switch (option.trim()) {
         case '1':
-            console.log("\n📋 PERFIL ATUAL DO ALEX:");
+            console.log("\n📋 PERFIL ATUAL DO ADMINISTRADOR:");
             const profile = db.getProfileData();
             for (const [k, v] of Object.entries(profile)) {
                 console.log(`- ${k}: ${v}`);

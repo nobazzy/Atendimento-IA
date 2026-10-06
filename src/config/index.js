@@ -43,6 +43,7 @@ module.exports = {
     CUSTOM_MODEL: process.env.CUSTOM_MODEL || '',
 
     // Sistema e Paths
+    HEADLESS: process.env.HEADLESS !== 'false',
     DB_PATH: path.join(__dirname, '../../database.sqlite'),
     BACKUP_DIR: path.join(__dirname, '../../backups'),
     SELF_JIDS_PATH: path.join(__dirname, '../../self_jids.json'),

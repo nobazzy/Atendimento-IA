@@ -11,7 +11,7 @@ function getAutomations() {
     }
 }
 
-function addAutomation(contactJid, type, time, messageTemplate, user = 'Alex') {
+function addAutomation(contactJid, type, time, messageTemplate, user = 'Admin') {
     try {
         const sJid = sanitizeInput(contactJid);
         const sType = sanitizeInput(type) || 'Lembrete';
@@ -31,7 +31,7 @@ function addAutomation(contactJid, type, time, messageTemplate, user = 'Alex') {
     }
 }
 
-function toggleAutomation(id, active, user = 'Alex') {
+function toggleAutomation(id, active, user = 'Admin') {
     try {
         const val = active ? 1 : 0;
         db.prepare('UPDATE automations SET active = ? WHERE id = ?').run(val, id);
@@ -42,7 +42,7 @@ function toggleAutomation(id, active, user = 'Alex') {
     }
 }
 
-function deleteAutomation(id, user = 'Alex') {
+function deleteAutomation(id, user = 'Admin') {
     try {
         db.prepare('DELETE FROM automations WHERE id = ?').run(id);
         addAuditLog(user, 'Apagou Automação', `ID: ${id}`, '🔴');

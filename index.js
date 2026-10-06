@@ -26,4 +26,11 @@ startServer();
 startScheduler();
 
 // 4. Inicializar Cliente WhatsApp Web MD
-client.initialize();
+client.initialize().catch(err => {
+    if (err.message && err.message.includes('The browser is already running')) {
+        console.error('\n⚠️ [WHATSAPP] A sessão já está em execução no computador.');
+        console.error('👉 O bot já está ativo em segundo plano ou em outro terminal.');
+    } else {
+        console.error('⚠️ [WHATSAPP] Erro na inicialização:', err.message);
+    }
+});

@@ -11,10 +11,10 @@ function getPromptVersions() {
     }
 }
 
-function createPromptVersion(promptText, author = 'Alex', notes = 'Atualização de Prompt') {
+function createPromptVersion(promptText, author = 'Admin', notes = 'Atualização de Prompt') {
     try {
         const sPrompt = sanitizeInput(promptText);
-        const sAuthor = sanitizeInput(author) || 'Alex';
+        const sAuthor = sanitizeInput(author) || 'Admin';
         const sNotes = sanitizeInput(notes) || 'Atualização manual de prompt';
         if (!sPrompt) return null;
 
@@ -33,7 +33,7 @@ function createPromptVersion(promptText, author = 'Alex', notes = 'Atualização
     }
 }
 
-function restorePromptVersion(versionId, user = 'Alex') {
+function restorePromptVersion(versionId, user = 'Admin') {
     try {
         const target = db.prepare('SELECT * FROM prompt_versions WHERE id = ? OR version = ?').get(versionId, versionId);
         if (!target) return null;
@@ -47,7 +47,7 @@ function restorePromptVersion(versionId, user = 'Alex') {
     }
 }
 
-function deletePromptVersion(id, user = 'Alex') {
+function deletePromptVersion(id, user = 'Admin') {
     try {
         db.prepare('DELETE FROM prompt_versions WHERE id = ? OR version = ?').run(id, id);
         addAuditLog(user, 'Excluiu Versão de Prompt', `ID/Versão: ${id}`, '🔴');
@@ -68,7 +68,7 @@ function getPersonalities() {
     }
 }
 
-function createPersonality(name, description, prompt, user = 'Alex') {
+function createPersonality(name, description, prompt, user = 'Admin') {
     try {
         const sName = sanitizeInput(name);
         const sDesc = sanitizeInput(description);
@@ -89,7 +89,7 @@ function createPersonality(name, description, prompt, user = 'Alex') {
     }
 }
 
-function deletePersonality(id, user = 'Alex') {
+function deletePersonality(id, user = 'Admin') {
     try {
         if (id === 'cloud') return false;
         db.prepare('DELETE FROM personalities WHERE id = ?').run(id);
@@ -100,7 +100,7 @@ function deletePersonality(id, user = 'Alex') {
     }
 }
 
-function setActivePersonality(id, user = 'Alex') {
+function setActivePersonality(id, user = 'Admin') {
     try {
         const target = db.prepare('SELECT * FROM personalities WHERE id = ?').get(id);
         if (!target) return false;
@@ -128,9 +128,25 @@ function getActivePersonalityPrompt() {
         const latestVersion = db.prepare('SELECT prompt FROM prompt_versions ORDER BY id DESC LIMIT 1').get();
         if (latestVersion && latestVersion.prompt) return latestVersion.prompt;
 
-        return 'Você é a CLOUD, IA assistente pessoal do Alex.';
+        return 'Você é a CLOUD, assistente virtual inteligente corporativa.';
     } catch (e) {
-        return 'Você é a CLOUD, IA assistente pessoal do Alex.';
+        return 'Você é a CLOUD, assistente virtual inteligente corporativa.';
+    }
+}
+
+function updatePersonality(id, name, description, prompt, user = 'Admin') {
+    try {
+        const sName = sanitizeInput(name);
+        const sDesc = sanitizeInput(description);
+        const sPrompt = sanitizeInput(prompt);
+        if (!sName || !sPrompt) return null;
+
+        db.prepare('UPDATE personalities SET name = ?, description = ?, prompt = ? WHERE id = ?').run(sName, sDesc, sPrompt, id);
+        addAuditLog(user, 'Atualizou Agente/Personalidade', `Nome: ${sName} (ID: ${id})`, '🟢');
+        return { id, name: sName, description: sDesc, prompt: sPrompt };
+    } catch (e) {
+        console.error('⚠️ Erro ao atualizar personality:', e.message);
+        return null;
     }
 }
 
@@ -141,6 +157,7 @@ module.exports = {
     deletePromptVersion,
     getPersonalities,
     createPersonality,
+    updatePersonality,
     deletePersonality,
     setActivePersonality,
     getActivePersonalityPrompt

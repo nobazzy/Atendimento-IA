@@ -11,7 +11,7 @@ function getPromptTemplates() {
     }
 }
 
-function applyPromptTemplate(templateId, user = 'Alex', companyId = 'default') {
+function applyPromptTemplate(templateId, user = 'Admin', companyId = 'default') {
     try {
         const target = db.prepare('SELECT * FROM prompt_templates WHERE id = ?').get(templateId);
         if (!target) return false;

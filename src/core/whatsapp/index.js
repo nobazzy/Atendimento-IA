@@ -1,5 +1,6 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const qrcodeTerminal = require('qrcode-terminal');
+const QRCode = require('qrcode');
 const fs = require('fs');
 const path = require('path');
 const config = require('../../config');
@@ -14,6 +15,8 @@ const { getPromptTemplates } = require('../../services/templates');
 const { getBusinessAnalytics } = require('../../services/analytics');
 const { getLlmTelemetry, callAIProvider } = require('../llm');
 const { addAuditLog } = require('../../services/audit');
+const { isOutsideBusinessHours, canSendAbsenceMessage, recordAbsenceMessageSent, getAllSettings } = require('../../services/settings');
+const { buildRagPromptContext, getKnowledgeDocs: getRagDocs } = require('../../services/rag');
 
 let selfJids = new Set();
 if (fs.existsSync(config.SELF_JIDS_PATH)) {
@@ -142,11 +145,27 @@ function cleanAuthSession() {
                     }
                 }
                 
-                // Remover trava residual SingletonLock se houver na pasta session
-                const lockPath = path.join(authDir, 'session', 'SingletonLock');
-                if (fs.existsSync(lockPath)) {
-                    fs.unlinkSync(lockPath);
-                    console.log('🧹 [PUPPETEER] Trava SingletonLock residual removida.');
+                // Remover travas residuais do Chrome/Puppeteer no Windows (evita erro "The browser is already running")
+                const sessionDir = path.join(authDir, 'session');
+                const lockFiles = [
+                    path.join(sessionDir, 'lockfile'),
+                    path.join(sessionDir, 'DevToolsActivePort'),
+                    path.join(sessionDir, 'SingletonLock'),
+                    path.join(sessionDir, 'SingletonCookie'),
+                    path.join(sessionDir, 'SingletonSocket'),
+                    path.join(defaultDir, 'lockfile'),
+                    path.join(defaultDir, 'DevToolsActivePort'),
+                    path.join(defaultDir, 'SingletonLock'),
+                    path.join(defaultDir, 'SingletonCookie'),
+                    path.join(defaultDir, 'SingletonSocket')
+                ];
+                for (const lf of lockFiles) {
+                    try {
+                        if (fs.existsSync(lf)) {
+                            fs.unlinkSync(lf);
+                            console.log(`🧹 [PUPPETEER] Trava residual removida: ${path.basename(lf)}`);
+                        }
+                    } catch (eL) {}
                 }
             }
         } catch (e) {
@@ -179,7 +198,7 @@ if (hasSessionSaved && process.env.FRESH_SESSION !== 'true') {
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
-        headless: false,
+        headless: config.HEADLESS !== false,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -200,6 +219,9 @@ const client = new Client({
 
 let isReady = false;
 let globalIsPaused = false;
+let isDisconnecting = false;
+let currentQrRaw = null;
+let currentQrDataUrl = null;
 const botSentMsgIds = new Set();
 const botSentTexts = new Set();
 let startupTimestamp = Date.now(); // Ignora mensagens antigas que chegam antes deste timestamp
@@ -363,37 +385,37 @@ function checkIsSelf(msg, clientObj = client, selfJidsSet = selfJids) {
     const myNum = config.MY_NUMBER ? config.MY_NUMBER.replace(/\D/g, '') : '';
     const widUser = (clientObj && clientObj.info && clientObj.info.wid && clientObj.info.wid.user) ? clientObj.info.wid.user : '';
 
-    const isFromAlex = (myNum && fromNum === myNum) || (widUser && fromNum === widUser) || selfJidsSet.has(msg.from);
-    const isToAlex = (myNum && toNum === myNum) || (widUser && toNum === widUser) || (myNum && remoteNum === myNum) || (widUser && remoteNum === widUser) || selfJidsSet.has(msg.to) || (msg.id && selfJidsSet.has(msg.id.remote));
+    const isFromAdmin = (myNum && fromNum === myNum) || (widUser && fromNum === widUser) || selfJidsSet.has(msg.from);
+    const isToAdmin = (myNum && toNum === myNum) || (widUser && toNum === widUser) || (myNum && remoteNum === myNum) || (widUser && remoteNum === widUser) || selfJidsSet.has(msg.to) || (msg.id && selfJidsSet.has(msg.id.remote));
 
     // Se a mensagem foi enviada por mim (msg.fromMe === true)
     if (msg.fromMe) {
-        // É auto-mensagem (Chat 'Você') apenas se o destinatário/remote for o próprio Alex
-        if (isToAlex || (toNum && myNum && toNum === myNum) || (toNum && widUser && toNum === widUser)) return true;
+        // É auto-mensagem (Chat 'Você') apenas se o destinatário/remote for o próprio Administrador
+        if (isToAdmin || (toNum && myNum && toNum === myNum) || (toNum && widUser && toNum === widUser)) return true;
         return false;
     }
 
-    // Se a mensagem foi recebida (!msg.fromMe), é self apenas se o remetente for o próprio Alex
-    if (isFromAlex) return true;
+    // Se a mensagem foi recebida (!msg.fromMe), é self apenas se o remetente for o próprio Administrador
+    if (isFromAdmin) return true;
 
     return false;
 }
 
 function getHelpMenuText() {
-    return `⚡ *CENTRAL DE COMANDOS DA CLOUD (!nobazzy)*
+    return `⚡ *CENTRAL DE COMANDOS DA IA (!admin ou !ia)*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📋 *PERFIL DO ALEX (SQLITE)*
-• \`!nobazzy perfil\` ➔ Ver dados cadastrados no perfil
-• \`!nobazzy set <chave> <valor>\` ➔ Atualizar dado (ex: \`!nobazzy set cidade São Paulo\`)
+📋 *PERFIL DO USUÁRIO / EMPRESA*
+• \`!admin perfil\` ➔ Ver dados cadastrados no perfil
+• \`!admin set <chave> <valor>\` ➔ Atualizar dado (ex: \`!admin set cidade São Paulo\`)
 
 🧠 *MEMÓRIAS & ANOTAÇÕES*
-• \`!nobazzy memorias\` ➔ Listar fatos e memórias gravadas
-• \`!nobazzy nota <texto>\` ➔ Gravar anotação rápida no SQLite
+• \`!admin memorias\` ➔ Listar fatos e memórias gravadas
+• \`!admin nota <texto>\` ➔ Gravar anotação rápida no SQLite
 
 📇 *AGENDA DE CONTATOS*
-• \`!nobazzy contatos\` ➔ Listar contatos cadastrados
-• \`!nobazzy contato <num> <nome> <relação>\` ➔ Cadastrar contato
+• \`!admin contatos\` ➔ Listar contatos cadastrados
+• \`!admin contato <num> <nome> <relação>\` ➔ Cadastrar contato
 
 🚫 *BLACKLIST DE BLOQUEIO DE RESPOSTAS*
 • \`!bloquear <número>\` ➔ Bloquear respostas automáticas para um celular
@@ -403,7 +425,7 @@ function getHelpMenuText() {
 • \`!bloqueados\` ➔ Listar contatos na Blacklist
 
 ⏰ *DISPARADOR DE AUTOMAÇÕES*
-• \`!nobazzy automacoes\` ➔ Ver agendamentos e envios diários
+• \`!admin automacoes\` ➔ Ver agendamentos e envios diários
 
 🔴 *CONTROLE REMOTO DE ATENDIMENTO*
 • \`!pausar\` ➔ Pausar respostas automáticas para terceiros (Modo Silencioso)
@@ -413,15 +435,15 @@ function getHelpMenuText() {
 📊 *TELEMETRIA & LIMPEZA*
 • \`!status\` ➔ Ver status da IA e estatísticas
 • \`!limpar\` ➔ Apagar histórico desta conversa no SQLite
-• \`!nobazzy rag\` ➔ Listar documentos RAG indexados
-• \`!nobazzy templates\` ➔ Listar templates de prompts por nicho`;
+• \`!admin rag\` ➔ Listar documentos RAG indexados
+• \`!admin templates\` ➔ Listar templates de prompts por nicho`;
 }
 
 function getProfileText() {
     const profile = getProfileData();
-    let txt = `📋 *PERFIL DO ALEX (CADASTRO NO SQLITE)*\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    let txt = `📋 *PERFIL DO ADMINISTRADOR (CADASTRO NO SQLITE)*\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
     if (profile.length === 0) {
-        txt += `Nenhum dado cadastrado ainda. Use \`!nobazzy set <chave> <valor>\` para cadastrar.`;
+        txt += `Nenhum dado cadastrado ainda. Use \`!admin set <chave> <valor>\` para cadastrar.`;
     } else {
         profile.forEach(p => { txt += `• *${p.key}*: ${p.value}\n`; });
     }
@@ -432,7 +454,7 @@ function getMemoriesText() {
     const memories = getMemories();
     let txt = `🧠 *MEMÓRIAS & ANOTAÇÕES GRAVADAS*\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
     if (memories.length === 0) {
-        txt += `Nenhuma memória gravada ainda. Use \`!nobazzy nota <texto>\` para anotações.`;
+        txt += `Nenhuma memória gravada ainda. Use \`!admin nota <texto>\` para anotações.`;
     } else {
         memories.slice(0, 15).forEach(m => { txt += `• [${m.category}] ${m.fact}\n`; });
     }
@@ -487,12 +509,15 @@ function getStatusText() {
 }
 
 function getRagText() {
-    const docs = getKnowledgeDocs();
+    const docs = getRagDocs();
     let txt = `📂 *BASE DE CONHECIMENTO RAG INDEXADA (${docs.length})*\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
     if (docs.length === 0) {
         txt += `Nenhum documento indexado no momento.`;
     } else {
-        docs.forEach(d => { txt += `• [${d.type.toUpperCase()}] *${d.title}*\n`; });
+        docs.forEach(d => { 
+            const chunks = d.chunk_count ? ` (${d.chunk_count} blocos)` : '';
+            txt += `• [${(d.type || 'DOC').toUpperCase()}] *${d.title}*${chunks}\n`; 
+        });
     }
     return txt;
 }
@@ -504,7 +529,7 @@ function getTemplatesText() {
     return txt;
 }
 
-function buildSystemPrompt(isSelf, senderLabel, contactInfo = {}) {
+function buildSystemPrompt(isSelf, senderLabel, contactInfo = {}, queryText = '') {
     const now = new Date();
     const tzOption = { timeZone: 'America/Sao_Paulo' };
     const dataAtual = now.toLocaleDateString('pt-BR', tzOption);
@@ -514,6 +539,7 @@ function buildSystemPrompt(isSelf, senderLabel, contactInfo = {}) {
     const personalityName = activeObj ? activeObj.name : 'Agente de IA';
     const personalityPrompt = getActivePersonalityPrompt();
     const trainingContext = getFormattedTrainingContext();
+    const ragContext = queryText ? buildRagPromptContext(queryText) : '';
     const timeContext = `[CONTEXTO EM TEMPO REAL]\n- Data de Hoje: ${dataAtual}\n- Horário Atual: ${horaAtual}`;
 
     const mandatoryPersonaHeader = `[PERSONA E IDENTIDADE ATIVA DESSA IA - REGRA ABSOLUTA DO SISTEMA]
@@ -536,12 +562,13 @@ ${personalityPrompt}`;
         return `${mandatoryPersonaHeader}
 
 [MODO DE TESTE / DIÁLOGO DIRETO]
-- Você está conversando com o Alex no chat de testes/comunicação direta.
+- Você está conversando com o Administrador no chat de testes/comunicação direta.
 - Mantenha 100% a persona '${personalityName}' definida acima em todas as suas respostas.
 
 ${timeContext}
 ${pContext}
-${trainingContext}`;
+${trainingContext}
+${ragContext}`;
     } else {
         const contactJid = senderLabel.includes('@') ? senderLabel : `${senderLabel}@c.us`;
         const dbContact = db.prepare('SELECT * FROM contacts WHERE jid = ? OR phone_jid = ? OR lid_jid = ?').get(contactJid, contactJid, contactJid);
@@ -557,44 +584,70 @@ ${trainingContext}`;
 
 [INSTRUÇÕES DE ATENDIMENTO A CLIENTE / TERCEIRO]
 - Você está respondendo a uma mensagem enviada por um cliente ou terceiro no WhatsApp comercial.${relationshipContext}
-- REGRA DE OURO: NUNCA chame o cliente de Alex.
+- REGRA DE OURO: NUNCA trate o cliente como se fosse o Administrador.
 - ${realName ? `Cumprimente o cliente pelo nome real ('${realName}').` : "Cumprimente o cliente educadamente."}
 - Responda estritamente mantendo a persona '${personalityName}' e as diretrizes definidas no prompt principal da IA ativada acima.
 
 ${timeContext}
-${trainingContext}`;
+${trainingContext}
+${ragContext}`;
     }
 }
 
-client.on('qr', (qr) => {
+client.on('qr', async (qr) => {
+    currentQrRaw = qr;
+    try {
+        currentQrDataUrl = await QRCode.toDataURL(qr, { margin: 2, scale: 6 });
+    } catch (e) {
+        currentQrDataUrl = null;
+    }
     console.log(`\n📲 QR CODE GERADO! Escaneie no WhatsApp.`);
-    qrcode.generate(qr, { small: true });
-    broadcastLog('security', 'QR Code Gerado', 'Aguardando escaneamento pelo celular', '🔵');
+    qrcodeTerminal.generate(qr, { small: true });
+    broadcastLog('security', 'QR Code Gerado', 'Aguardando escaneamento pelo celular ou painel web', '🔵');
 });
 
 client.on('authenticated', () => {
+    currentQrRaw = null;
+    currentQrDataUrl = null;
     console.log(`[Auth] ✅ Autenticação bem-sucedida!`);
     broadcastLog('security', 'Autenticação Concluída', 'Sessão do WhatsApp autenticada com sucesso', '🟢');
+});
+
+client.on('loading_screen', (percent, message) => {
+    console.log(`⏳ [CARREGANDO WHATSAPP] ${percent}% - ${message}`);
+});
+
+client.on('change_state', (state) => {
+    console.log(`📶 [ESTADO WHATSAPP] ${state}`);
 });
 
 client.on('auth_failure', (msg) => {
     console.error('❌ [Auth Failure] Falha na autenticação do WhatsApp:', msg);
     isReady = false;
+    currentQrRaw = null;
+    currentQrDataUrl = null;
     broadcastLog('security', 'Falha de Autenticação', msg || 'Erro de credencial', '🔴');
 });
 
 client.on('disconnected', (reason) => {
     console.warn('⚠️ [WhatsApp Disconnected] Cliente WhatsApp desconectou:', reason);
     isReady = false;
+    currentQrRaw = null;
+    currentQrDataUrl = null;
     broadcastLog('system', 'WhatsApp Desconectado', `Motivo: ${reason}`, '🔴');
-    setTimeout(() => {
-        console.log('🔄 Tentando re-inicializar o cliente WhatsApp...');
-        client.initialize().catch(e => console.error('Erro ao reconectar WhatsApp:', e.message));
-    }, 5000);
+    if (!isDisconnecting) {
+        setTimeout(() => {
+            console.log('🔄 Tentando re-inicializar o cliente WhatsApp...');
+            cleanAuthSession();
+            client.initialize().catch(e => console.error('Erro ao reconectar WhatsApp:', e.message));
+        }, 4000);
+    }
 });
 
 client.on('ready', async () => {
     isReady = true;
+    currentQrRaw = null;
+    currentQrDataUrl = null;
     startupTimestamp = Date.now(); // Marca o momento exato que o WhatsApp ficou pronto
     await updateSelfInfo(client);
     console.log(`\n🟢 WHATSAPP CONECTADO E PRONTO PARA ATENDIMENTO! (timestamp: ${startupTimestamp})`);
@@ -782,33 +835,87 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
             }
         }
 
-        // ──── CAPTURA DE LID (NÃO-BLOQUEANTE - Roda em segundo plano sem travar a resposta da IA) ────
+        // ──── CAPTURA AUTOMÁTICA DE LID BIDIRECIONAL (NÃO-BLOQUEANTE) ────
         if (!msg.fromMe && msg.from) {
             const _fromJid = msg.from;
-            const _rawData = msg._data || msg.rawData || {};
             setTimeout(async () => {
                 try {
                     if (_fromJid.includes('@lid')) {
-                        const contact = await withTimeout(client.getContactById(_fromJid), 5000).catch(() => null);
+                        let resolvedPhone = '';
+                        let resolvedName = '';
+
+                        // 1. Resolver telefone do LID via WWebJS / Puppeteer
+                        if (client.pupPage) {
+                            try {
+                                const pair = await client.pupPage.evaluate(async (lid) => {
+                                    try {
+                                        if (window.WWebJS && typeof window.WWebJS.enforceLidAndPnRetrieval === 'function') {
+                                            const res = await window.WWebJS.enforceLidAndPnRetrieval(lid);
+                                            const pnStr = res && res.phone ? (res.phone._serialized || res.phone) : '';
+                                            return { phone: pnStr };
+                                        }
+                                        if (window.require) {
+                                            const wid = window.require('WAWebWidFactory').createWid(lid);
+                                            const pn = window.require('WAWebApiContact').getPhoneNumber(wid);
+                                            return { phone: pn ? (pn._serialized || pn) : '' };
+                                        }
+                                    } catch(e) {}
+                                    return null;
+                                }, _fromJid);
+
+                                if (pair && pair.phone) {
+                                    resolvedPhone = pair.phone;
+                                }
+                            } catch(e) {}
+                        }
+
+                        // 2. Se falhar, tentar método getContactLidAndPhone
+                        if (!resolvedPhone && typeof client.getContactLidAndPhone === 'function') {
+                            try {
+                                const res = await client.getContactLidAndPhone([_fromJid]);
+                                if (res && res[0] && res[0].pn) {
+                                    resolvedPhone = res[0].pn;
+                                }
+                            } catch(e) {}
+                        }
+
+                        // 3. Buscar nome do contato
+                        const contact = await withTimeout(client.getContactById(_fromJid), 4000).catch(() => null);
                         if (contact) {
-                            const cName = contact.name || contact.pushname || contact.shortName || '';
-                            const cPhone = contact.number ? `${contact.number}@c.us` : '';
-                            if (cName !== '@nobazzy' && cPhone && !cPhone.includes('5511935855321')) {
-                                saveLidMapping(_fromJid, cPhone, cName);
-                                console.log(`🔗 [LID BG] ${_fromJid} → ${cPhone} (${cName})`);
-                            }
+                            resolvedName = contact.name || contact.pushname || contact.shortName || '';
+                        }
+
+                        // 4. Salvar mapeamento
+                        if (resolvedPhone) {
+                            saveLidMapping(_fromJid, resolvedPhone, resolvedName);
+                            console.log(`🔗 [LID AUTO-CAPTURA] ${_fromJid} ➔ ${resolvedPhone} (${resolvedName})`);
+                        } else if (resolvedName) {
+                            saveLidMapping(_fromJid, '', resolvedName);
                         }
                     } else if (_fromJid.includes('@c.us')) {
-                        let foundLid = '';
-                        if (_rawData.author && typeof _rawData.author === 'string' && _rawData.author.includes('@lid')) {
-                            foundLid = _rawData.author;
+                        let resolvedLid = '';
+                        if (client.pupPage) {
+                            try {
+                                const pair = await client.pupPage.evaluate(async (phoneJid) => {
+                                    try {
+                                        if (window.WWebJS && typeof window.WWebJS.enforceLidAndPnRetrieval === 'function') {
+                                            const res = await window.WWebJS.enforceLidAndPnRetrieval(phoneJid);
+                                            return res && res.lid ? (res.lid._serialized || res.lid) : null;
+                                        }
+                                        if (window.require) {
+                                            const wid = window.require('WAWebWidFactory').createWid(phoneJid);
+                                            const lid = window.require('WAWebApiContact').getCurrentLid(wid);
+                                            return lid ? (lid._serialized || lid) : null;
+                                        }
+                                    } catch(e) {}
+                                    return null;
+                                }, _fromJid);
+                                if (pair && String(pair).includes('@lid')) resolvedLid = String(pair);
+                            } catch(e) {}
                         }
-                        if (!foundLid && _rawData.from && typeof _rawData.from === 'object' && _rawData.from._serialized && _rawData.from._serialized.includes('@lid')) {
-                            foundLid = _rawData.from._serialized;
-                        }
-                        if (foundLid && foundLid.includes('@lid')) {
-                            saveLidMapping(foundLid, _fromJid, '');
-                            console.log(`🔗 [LID BG] ${foundLid} → ${_fromJid}`);
+                        if (resolvedLid) {
+                            saveLidMapping(resolvedLid, _fromJid, '');
+                            console.log(`🔗 [LID AUTO-CAPTURA] ${resolvedLid} ➔ ${_fromJid}`);
                         }
                     }
                 } catch(e) {}
@@ -833,7 +940,7 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
 
         console.log(`📩 [MSG DETECTADA] fromMe=${msg.fromMe} | from=${msg.from} | to=${msg.to} | body="${body.substring(0, 35)}"`);
 
-        // ─── 1. MENSAGENS ENVIADAS PELO PRÓPRIO ALEX (msg.fromMe === true) ───
+        // ─── 1. MENSAGENS ENVIADAS PELO PRÓPRIO ADMINISTRADOR (msg.fromMe === true) ───
         if (msg.fromMe) {
             if (botSentTexts.has(body)) return;
             if (msg.id && msg.id.id && botSentMsgIds.has(msg.id.id)) return;
@@ -843,10 +950,10 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
 
             // A) SE FOI DIGITADO EM CHAT DE TERCEIRO (!isSelf):
             if (!isSelf) {
-                if (lower.startsWith('!nobazzy bloquear') || lower.startsWith('!bloquear') || lower.startsWith('!block') || lower.startsWith('!nobazzy block')) {
+                if (lower.startsWith('!admin bloquear') || lower.startsWith('!ia bloquear') || lower.startsWith('!admin bloquear') || lower.startsWith('!bloquear') || lower.startsWith('!block') || lower.startsWith('!admin block') || lower.startsWith('!ia block') || lower.startsWith('!admin block')) {
                     let raw = '';
-                    if (lower.startsWith('!nobazzy bloquear')) raw = body.slice(17).trim();
-                    else if (lower.startsWith('!nobazzy block')) raw = body.slice(14).trim();
+                    if (lower.startsWith('!admin bloquear') || lower.startsWith('!ia bloquear') || lower.startsWith('!admin bloquear')) raw = body.slice(17).trim();
+                    else if (lower.startsWith('!admin block') || lower.startsWith('!ia block') || lower.startsWith('!admin block')) raw = body.slice(14).trim();
                     else if (lower.startsWith('!bloquear')) raw = body.slice(9).trim();
                     else if (lower.startsWith('!block')) raw = body.slice(6).trim();
 
@@ -859,26 +966,26 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
                             if (raw.includes('@lid') || (c && c.id && c.id._serialized && c.id._serialized.includes('@lid'))) {
                                 saveLidMapping(raw.includes('@lid') ? raw : c.id._serialized, cPhone, cName);
                             }
-                            blockContact(raw, cName, 'Alex');
+                            blockContact(raw, cName, 'Admin');
                             if (c && c.block) await c.block().catch(() => {});
                         } catch(e) {
-                            blockContact(raw, '', 'Alex');
+                            blockContact(raw, '', 'Admin');
                         }
                         broadcastLog('security', 'Contato Bloqueado pelo Comando Direct (Silencioso)', `JID: ${raw}`, '🔴');
                     }
                     return;
                 }
 
-                if (lower.startsWith('!nobazzy desbloquear') || lower.startsWith('!desbloquear') || lower.startsWith('!unblock') || lower.startsWith('!nobazzy unblock')) {
+                if (lower.startsWith('!admin desbloquear') || lower.startsWith('!ia desbloquear') || lower.startsWith('!admin desbloquear') || lower.startsWith('!desbloquear') || lower.startsWith('!unblock') || lower.startsWith('!admin unblock') || lower.startsWith('!ia unblock') || lower.startsWith('!admin unblock')) {
                     let raw = '';
-                    if (lower.startsWith('!nobazzy desbloquear')) raw = body.slice(20).trim();
-                    else if (lower.startsWith('!nobazzy unblock')) raw = body.slice(16).trim();
+                    if (lower.startsWith('!admin desbloquear') || lower.startsWith('!ia desbloquear') || lower.startsWith('!admin desbloquear')) raw = body.slice(20).trim();
+                    else if (lower.startsWith('!admin unblock') || lower.startsWith('!ia unblock') || lower.startsWith('!admin unblock')) raw = body.slice(16).trim();
                     else if (lower.startsWith('!desbloquear')) raw = body.slice(12).trim();
                     else if (lower.startsWith('!unblock')) raw = body.slice(8).trim();
 
                     if (!raw) raw = currentChatJid;
                     if (raw) {
-                        unblockContact(raw, 'Alex');
+                        unblockContact(raw, 'Admin');
                         try {
                             client.getContactById(raw.includes('@') ? raw : `${raw.replace(/\D/g, '')}@c.us`)
                                   .then(async c => { if (c && c.unblock) await c.unblock().catch(() => {}); })
@@ -889,89 +996,89 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
                     return;
                 }
 
-                if (lower === '!pausar' || lower === '!nobazzy pausar') {
+                if (lower === '!pausar' || lower === '!admin pausar' || lower === '!ia pausar' || lower === '!admin pausar') {
                     globalIsPaused = true;
                     broadcastLog('system', 'IA Pausada (Silencioso)', 'Cloud entrou em Modo Silencioso', '🔴');
                     return;
                 }
 
-                if (lower === '!retomar' || lower === '!nobazzy retomar') {
+                if (lower === '!retomar' || lower === '!admin retomar' || lower === '!ia retomar' || lower === '!admin retomar') {
                     globalIsPaused = false;
                     broadcastLog('system', 'IA Reativada (Silencioso)', 'Cloud voltou a atender', '🟢');
                     return;
                 }
 
-                // Se o Alex digitou qualquer outro comando ou mensagem comum em chat de cliente: SILÊNCIO ABSOLUTO!
-                console.log(`ℹ️ [IGNORADO] Mensagem digitada pelo Alex manualmente no chat [${currentChatJid}].`);
+                // Se o Administrador digitou qualquer outro comando ou mensagem comum em chat de cliente: SILÊNCIO ABSOLUTO!
+                console.log(`ℹ️ [IGNORADO] Mensagem digitada pelo Administrador manualmente no chat [${currentChatJid}].`);
                 return;
             }
 
-            // B) MENSAGENS OU COMANDOS DIGITADOS NO CHAT PRÓPRIO DO ALEX ("VOCÊ" / isSelf === true)
-            if (body.startsWith('!') || body.toLowerCase().startsWith('!nobazzy')) {
-                if (lower === '!nobazzy' || lower === '!ajuda' || lower === '!comandos' || lower === '!nobazzy ajuda' || lower === '!nobazzy comandos') {
+            // B) MENSAGENS OU COMANDOS DIGITADOS NO CHAT PRÓPRIO DO ADMINISTRADOR ("VOCÊ" / isSelf === true)
+            if (body.startsWith('!') || body.toLowerCase().startsWith('!admin') || body.toLowerCase().startsWith('!ia') || body.toLowerCase().startsWith('!admin')) {
+                if (lower === '!admin' || lower === '!ia' || lower === '!admin' || lower === '!ajuda' || lower === '!comandos' || lower === '!admin ajuda' || lower === '!ia ajuda' || lower === '!admin ajuda' || lower === '!admin comandos' || lower === '!ia comandos' || lower === '!admin comandos') {
                     await sendBotMessage(currentChatJid, getHelpMenuText());
                     return;
                 }
 
-                if (lower === '!nobazzy perfil' || lower === '!perfil') {
+                if (lower === '!admin perfil' || lower === '!ia perfil' || lower === '!admin perfil' || lower === '!perfil') {
                     await sendBotMessage(currentChatJid, getProfileText());
                     return;
                 }
 
-                if (lower.startsWith('!nobazzy set ') || lower.startsWith('!set ')) {
-                    const rawArgs = body.startsWith('!nobazzy set ') ? body.slice(13).trim() : body.slice(5).trim();
+                if (lower.startsWith('!admin set ') || lower.startsWith('!ia set ') || lower.startsWith('!admin set ') || lower.startsWith('!set ')) {
+                    const rawArgs = body.startsWith('!admin set ') ? body.slice(13).trim() : body.slice(5).trim();
                     const spaceIdx = rawArgs.indexOf(' ');
                     if (spaceIdx > 0) {
                         const key = rawArgs.substring(0, spaceIdx).trim();
                         const val = rawArgs.substring(spaceIdx + 1).trim();
-                        setProfileValue(key, val, 'Alex');
+                        setProfileValue(key, val, 'Admin');
                         await sendBotMessage(currentChatJid, `✅ *DADO DO PERFIL SALVO NO SQLITE!*\n• *${key}*: ${val}`);
                     }
                     return;
                 }
 
-                if (lower === '!nobazzy memorias' || lower === '!memorias') {
+                if (lower === '!admin memorias' || lower === '!ia memorias' || lower === '!admin memorias' || lower === '!memorias') {
                     await sendBotMessage(currentChatJid, getMemoriesText());
                     return;
                 }
 
-                if (lower.startsWith('!nobazzy nota ') || lower.startsWith('!nota ')) {
-                    const noteText = body.startsWith('!nobazzy nota ') ? body.slice(14).trim() : body.slice(6).trim();
+                if (lower.startsWith('!admin nota ') || lower.startsWith('!ia nota ') || lower.startsWith('!admin nota ') || lower.startsWith('!nota ')) {
+                    const noteText = body.startsWith('!admin nota ') ? body.slice(14).trim() : body.slice(6).trim();
                     if (noteText) {
-                        addMemory('Anotação Geral', noteText, 'Alex');
+                        addMemory('Anotação Geral', noteText, 'Admin');
                         await sendBotMessage(currentChatJid, `📝 *ANOTAÇÃO GRAVADA NO SQLITE!*\n• ${noteText}`);
                     }
                     return;
                 }
 
-                if (lower === '!nobazzy contatos' || lower === '!contatos') {
+                if (lower === '!admin contatos' || lower === '!ia contatos' || lower === '!admin contatos' || lower === '!contatos') {
                     await sendBotMessage(currentChatJid, getContactsText());
                     return;
                 }
 
-                if (lower.startsWith('!nobazzy contato ') || lower.startsWith('!contato ')) {
-                    const rawArgs = body.startsWith('!nobazzy contato ') ? body.slice(17).trim() : body.slice(9).trim();
+                if (lower.startsWith('!admin contato ') || lower.startsWith('!ia contato ') || lower.startsWith('!admin contato ') || lower.startsWith('!contato ')) {
+                    const rawArgs = body.startsWith('!admin contato ') ? body.slice(17).trim() : body.slice(9).trim();
                     const parts = rawArgs.split(' ');
                     if (parts.length >= 2) {
                         const num = parts[0];
                         const name = parts[1];
                         const rel = parts.slice(2).join(' ') || 'Contato';
                         const jid = num.includes('@') ? num : `${num.replace(/\D/g, '')}@c.us`;
-                        saveContact(jid, name, rel, '', '', 'Geral', 0, 'Alex');
+                        saveContact(jid, name, rel, '', '', 'Geral', 0, 'Admin');
                         await sendBotMessage(currentChatJid, `📇 *CONTATO CADASTRADO NO SQLITE!*\n• *Nome:* ${name}\n• *JID:* ${jid}`);
                     }
                     return;
                 }
 
-                if (lower.startsWith('!nobazzy bloquear') || lower.startsWith('!bloquear') || lower.startsWith('!block')) {
+                if (lower.startsWith('!admin bloquear') || lower.startsWith('!ia bloquear') || lower.startsWith('!admin bloquear') || lower.startsWith('!bloquear') || lower.startsWith('!block')) {
                     let raw = '';
-                    if (lower.startsWith('!nobazzy bloquear')) raw = body.slice(17).trim();
+                    if (lower.startsWith('!admin bloquear') || lower.startsWith('!ia bloquear') || lower.startsWith('!admin bloquear')) raw = body.slice(17).trim();
                     else if (lower.startsWith('!bloquear')) raw = body.slice(9).trim();
                     else if (lower.startsWith('!block')) raw = body.slice(6).trim();
 
                     if (!raw) raw = currentChatJid;
                     if (raw) {
-                        blockContact(raw, '', 'Alex');
+                        blockContact(raw, '', 'Admin');
                         try {
                             client.getContactById(raw.includes('@') ? raw : `${raw.replace(/\D/g, '')}@c.us`)
                                   .then(async c => { if (c && c.block) await c.block().catch(() => {}); })
@@ -982,15 +1089,15 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
                     return;
                 }
 
-                if (lower.startsWith('!nobazzy desbloquear') || lower.startsWith('!desbloquear') || lower.startsWith('!unblock')) {
+                if (lower.startsWith('!admin desbloquear') || lower.startsWith('!ia desbloquear') || lower.startsWith('!admin desbloquear') || lower.startsWith('!desbloquear') || lower.startsWith('!unblock')) {
                     let raw = '';
-                    if (lower.startsWith('!nobazzy desbloquear')) raw = body.slice(20).trim();
+                    if (lower.startsWith('!admin desbloquear') || lower.startsWith('!ia desbloquear') || lower.startsWith('!admin desbloquear')) raw = body.slice(20).trim();
                     else if (lower.startsWith('!desbloquear')) raw = body.slice(12).trim();
                     else if (lower.startsWith('!unblock')) raw = body.slice(8).trim();
 
                     if (!raw) raw = currentChatJid;
                     if (raw) {
-                        unblockContact(raw, 'Alex');
+                        unblockContact(raw, 'Admin');
                         try {
                             client.getContactById(raw.includes('@') ? raw : `${raw.replace(/\D/g, '')}@c.us`)
                                   .then(async c => { if (c && c.unblock) await c.unblock().catch(() => {}); })
@@ -1001,51 +1108,51 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
                     return;
                 }
 
-                if (lower === '!bloqueados' || lower === '!nobazzy bloqueados') {
+                if (lower === '!bloqueados' || lower === '!admin bloqueados') {
                     await sendBotMessage(currentChatJid, getBlockedText());
                     return;
                 }
 
-                if (lower === '!nobazzy automacoes' || lower === '!automacoes') {
+                if (lower === '!admin automacoes' || lower === '!ia automacoes' || lower === '!admin automacoes' || lower === '!automacoes') {
                     await sendBotMessage(currentChatJid, getAutomationsText());
                     return;
                 }
 
-                if (lower === '!pausar' || lower === '!nobazzy pausar') {
+                if (lower === '!pausar' || lower === '!admin pausar' || lower === '!ia pausar' || lower === '!admin pausar') {
                     globalIsPaused = true;
                     await sendBotMessage(currentChatJid, '⏸️ *CLOUD PAUSADA (MODO SILENCIOSO)*');
                     return;
                 }
 
-                if (lower === '!retomar' || lower === '!nobazzy retomar') {
+                if (lower === '!retomar' || lower === '!admin retomar' || lower === '!ia retomar' || lower === '!admin retomar') {
                     globalIsPaused = false;
                     await sendBotMessage(currentChatJid, '▶️ *CLOUD REATIVADA COM SUCESSO!*');
                     return;
                 }
 
-                if (lower === '!desligar' || lower === '!nobazzy desligar') {
+                if (lower === '!desligar' || lower === '!admin desligar') {
                     await sendBotMessage(currentChatJid, '🔴 *ENCERRANDO PROCESSO CLOUD AI...*');
                     setTimeout(() => process.exit(0), 1000);
                     return;
                 }
 
-                if (lower === '!status' || lower === '!nobazzy status') {
+                if (lower === '!status' || lower === '!admin status') {
                     await sendBotMessage(currentChatJid, getStatusText());
                     return;
                 }
 
-                if (lower === '!limpar' || lower === '!nobazzy limpar') {
+                if (lower === '!limpar' || lower === '!admin limpar') {
                     db.prepare('DELETE FROM chat_history WHERE chat_id = ?').run(currentChatJid);
                     await sendBotMessage(currentChatJid, '🧹 *HISTÓRICO DESTA CONVERSA LIMPO NO SQLITE!*');
                     return;
                 }
 
-                if (lower === '!nobazzy rag' || lower === '!rag') {
+                if (lower === '!admin rag' || lower === '!ia rag' || lower === '!admin rag' || lower === '!rag') {
                     await sendBotMessage(currentChatJid, getRagText());
                     return;
                 }
 
-                if (lower === '!nobazzy templates' || lower === '!templates') {
+                if (lower === '!admin templates' || lower === '!ia templates' || lower === '!admin templates' || lower === '!templates') {
                     await sendBotMessage(currentChatJid, getTemplatesText());
                     return;
                 }
@@ -1053,16 +1160,16 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
                 return;
             }
 
-            // C) MENSAGENS NORMAIS ENVIADAS PELO ALEX PARA SI MESMO (CHAT "VOCÊ" / isSelf === true)
-            // QUANDO O ALEX ENVIA MENSAGEM NO PRÓPRIO CHAT ("VOCÊ"), A IA RESPONDE AO ALEX!
-            console.log(`💬 [MENSAGEM ALEX -> CHAT VOCÊ]: "${body}"`);
-            broadcastLog('chat', 'Mensagem do Alex no Chat Você', `Para [Alex]: "${body.substring(0, 40)}..."`, '🟢');
+            // C) MENSAGENS NORMAIS ENVIADAS PELO ADMINISTRADOR PARA SI MESMO (CHAT "VOCÊ" / isSelf === true)
+            // QUANDO O ADMINISTRADOR ENVIA MENSAGEM NO PRÓPRIO CHAT ("VOCÊ"), A IA RESPONDE AO ADMINISTRADOR!
+            console.log(`💬 [MENSAGEM ADMINISTRADOR -> CHAT VOCÊ]: "${body}"`);
+            broadcastLog('chat', 'Mensagem do Administrador no Chat Você', `Para [Administrador]: "${body.substring(0, 40)}..."`, '🟢');
             db.prepare('INSERT INTO chat_history (chat_id, sender, message, timestamp) VALUES (?, ?, ?, ?)').run(currentChatJid, 'user', body, new Date().toISOString());
 
             const historyRows = db.prepare('SELECT sender, message FROM chat_history WHERE chat_id = ? ORDER BY id DESC LIMIT 10').all(currentChatJid).reverse();
 
             let promptMessages = [
-                { role: 'system', content: buildSystemPrompt(true, 'Alex') }
+                { role: 'system', content: buildSystemPrompt(true, 'Admin', {}, body) }
             ];
 
             historyRows.forEach(row => {
@@ -1072,7 +1179,7 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
                 });
             });
 
-            broadcastLog('ai', 'Enviando Prompt (Modo Criador/Alex) para a IA', `Provedor: ${config.ACTIVE_PROVIDER || 'OpenAI'}`, '🔵');
+            broadcastLog('ai', 'Enviando Prompt (Modo Criador/Administrador) para a IA', `Provedor: ${config.ACTIVE_PROVIDER || 'OpenAI'}`, '🔵');
 
             const aiReply = await callAIProvider(promptMessages);
 
@@ -1083,8 +1190,8 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
                 }
 
                 db.prepare('INSERT INTO chat_history (chat_id, sender, message, timestamp) VALUES (?, ?, ?, ?)').run(currentChatJid, 'assistant', formattedReply, new Date().toISOString());
-                console.log(`🤖 [IA RESPONDEU ALEX NO CHAT VOCÊ]: "${formattedReply}"`);
-                broadcastLog('ai', 'IA Respondeu ao Alex', `No Chat Você: "${formattedReply.substring(0, 40)}..."`, '🟢');
+                console.log(`🤖 [IA RESPONDEU ADMINISTRADOR NO CHAT VOCÊ]: "${formattedReply}"`);
+                broadcastLog('ai', 'IA Respondeu ao Administrador', `No Chat Você: "${formattedReply.substring(0, 40)}..."`, '🟢');
 
                 await sendBotMessage(currentChatJid, formattedReply, msg);
             }
@@ -1094,11 +1201,11 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
         // ─── 2. MENSAGENS INCOMING RECEBIDAS DE TERCEIROS (!msg.fromMe) ───
         const customerJid = msg.from;
 
-        // Se a mensagem incoming for do próprio Alex (segundo aparelho/sessão), NUNCA TRATAR COMO CLIENTE!
+        // Se a mensagem incoming for do próprio Administrador (segundo aparelho/sessão), NUNCA TRATAR COMO CLIENTE!
         const cleanCustomer = cleanNumber(customerJid);
         const cleanMyNumber = cleanNumber(config.MY_NUMBER);
         if (isSelf || selfJids.has(customerJid) || (cleanMyNumber && cleanCustomer === cleanMyNumber)) {
-            console.log(`ℹ️ [IGNORADO] Mensagem recebida do próprio número do Alex [${customerJid}].`);
+            console.log(`ℹ️ [IGNORADO] Mensagem recebida do próprio número do Administrador [${customerJid}].`);
             return;
         }
 
@@ -1126,10 +1233,124 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
         broadcastLog('chat', 'Mensagem Recebida', `De [${customerJid}]: "${body.substring(0, 40)}..."`, '🟢');
         db.prepare('INSERT INTO chat_history (chat_id, sender, message, timestamp) VALUES (?, ?, ?, ?)').run(customerJid, 'user', body, new Date().toISOString());
 
-        const historyRows = db.prepare('SELECT sender, message FROM chat_history WHERE chat_id = ? ORDER BY id DESC LIMIT 10').all(customerJid).reverse();
+        // Verificação de Horário Comercial & Mensagem de Ausência
+        const currentSettings = getAllSettings();
+        const hoursEnabled = currentSettings && currentSettings.businessHours && currentSettings.businessHours.enabled;
+
+        if (hoursEnabled && isOutsideBusinessHours()) {
+            console.log(`🌙 [HORÁRIO COMERCIAL] Mensagem de [${customerJid}] recebida fora do expediente.`);
+            broadcastLog('system', 'Fora do Horário Comercial', `Mensagem de ${customerJid} recebida fora do expediente (Controle Ativo)`, '🌙');
+
+            const absenceEnabled = currentSettings && currentSettings.absence && currentSettings.absence.enabled;
+            if (absenceEnabled && canSendAbsenceMessage(customerJid)) {
+                const absenceMsg = (currentSettings && currentSettings.absence && currentSettings.absence.message)
+                    ? currentSettings.absence.message
+                    : 'Olá! No momento estamos fora do nosso horário de atendimento.';
+                const formattedAbsence = `👋 ${absenceMsg}`;
+                db.prepare('INSERT INTO chat_history (chat_id, sender, message, timestamp) VALUES (?, ?, ?, ?)').run(customerJid, 'assistant', formattedAbsence, new Date().toISOString());
+                await sendBotMessage(customerJid, formattedAbsence, msg);
+                recordAbsenceMessageSent(customerJid);
+                broadcastLog('chat', 'Mensagem de Ausência Enviada', `Para [${customerJid}]: "${absenceMsg.substring(0, 40)}..."`, '🌙');
+            } else if (!absenceEnabled) {
+                console.log(`ℹ️ [AUSÊNCIA DESATIVADA] Mensagem de ausência desativada nas configurações. Permanecendo em silêncio fora do expediente.`);
+            }
+            return;
+        }
+
+        // ─── DISPARO COM BUFFER INTELIGENTE DE DEBOUNCE (AGRUPA MENSAGENS RÁPIDAS) ───
+        scheduleCustomerAiReply(customerJid, msg, body);
+        return;
+
+    } catch (e) {
+        console.error('⚠️ Erro no processamento do WhatsApp:', e.message);
+    }
+}
+
+// ─── BUFFER DE DEBOUNCE & AGREGAÇÃO INTELIGENTE DE MENSAGENS POR CONTATO ───
+// Evita respostas duplicadas quando o cliente envia frases curtas picadas em sequência rápida
+const customerDebounceMap = new Map();
+const customerProcessingSet = new Set();
+
+/**
+ * Enfileira e consolida mensagens rápidas do mesmo contato.
+ * Aguarda uma janela de debounce (padrão 4.0s) antes de disparar a IA.
+ * Se novas mensagens chegarem nessa janela, reinicia o timer e agrupa todas!
+ */
+function scheduleCustomerAiReply(customerJid, msgObj, bodyText) {
+    const settings = getAllSettings();
+    const debounceSeconds = (settings && settings.ai && settings.ai.debounce_seconds)
+        ? Number(settings.ai.debounce_seconds)
+        : 4.0;
+    const debounceDelayMs = Math.max(1000, Math.min(15000, Math.round(debounceSeconds * 1000)));
+
+    let buffer = customerDebounceMap.get(customerJid);
+
+    if (!buffer) {
+        buffer = {
+            messages: [bodyText],
+            lastMsgObj: msgObj,
+            firstTimestamp: Date.now(),
+            timer: null
+        };
+    } else {
+        buffer.messages.push(bodyText);
+        buffer.lastMsgObj = msgObj;
+        if (buffer.timer) {
+            clearTimeout(buffer.timer);
+            buffer.timer = null;
+        }
+    }
+
+    // Se a IA já estiver processando uma resposta para este cliente no momento,
+    // apenas acumulamos no buffer. Quando a resposta atual terminar, ela iniciará
+    // automaticamente um novo ciclo para responder às mensagens pendentes.
+    if (customerProcessingSet.has(customerJid)) {
+        console.log(`⏳ [BUFFER IA] Nova mensagem recebida de [${customerJid}] durante processamento ativo. Acumulada no buffer pendente.`);
+        customerDebounceMap.set(customerJid, buffer);
+        return;
+    }
+
+    // Limite máximo de espera acumulada (10s) para não travar respostas se o cliente digitar sem parar
+    const MAX_WAIT_MS = 10000;
+    const elapsed = Date.now() - buffer.firstTimestamp;
+    const effectiveDelay = (elapsed + debounceDelayMs > MAX_WAIT_MS)
+        ? Math.max(500, MAX_WAIT_MS - elapsed)
+        : debounceDelayMs;
+
+    console.log(`⏳ [BUFFER IA] Aguardando ${effectiveDelay / 1000}s para consolidar mensagens de [${customerJid}] (${buffer.messages.length} msg(s) agrupada(s))...`);
+    broadcastLog('ai', 'Agrupando Mensagens Rápidas', `Cliente [${customerJid}] (${buffer.messages.length} msg(s) em buffer, espera ${effectiveDelay / 1000}s)`, '🔵');
+
+    buffer.timer = setTimeout(async () => {
+        const currentBuffer = customerDebounceMap.get(customerJid);
+        if (!currentBuffer) return;
+        customerDebounceMap.delete(customerJid);
+        await processConsolidatedAiReply(customerJid, currentBuffer.lastMsgObj, currentBuffer.messages);
+    }, effectiveDelay);
+
+    customerDebounceMap.set(customerJid, buffer);
+}
+
+/**
+ * Executa a chamada à IA consolidando todas as mensagens recebidas na rajada
+ */
+async function processConsolidatedAiReply(customerJid, lastMsgObj, bufferedMessages) {
+    if (customerProcessingSet.has(customerJid)) return;
+    customerProcessingSet.add(customerJid);
+
+    try {
+        const settings = getAllSettings();
+        const historyLimit = (settings && settings.ai && settings.ai.history_limit) ? settings.ai.history_limit : 10;
+
+        // Histórico recente do SQLite (as mensagens da rajada já foram salvas em chat_history individualmente)
+        const historyRows = db.prepare(
+            'SELECT sender, message FROM chat_history WHERE chat_id = ? ORDER BY id DESC LIMIT ?'
+        ).all(customerJid, historyLimit).reverse();
+
+        // Une as mensagens do lote atual para consulta de RAG e prompt do sistema
+        const consolidatedQuery = bufferedMessages.join('\n');
 
         let promptMessages = [
-            { role: 'system', content: buildSystemPrompt(false, customerJid.replace('@c.us', '')) }
+            { role: 'system', content: buildSystemPrompt(false, customerJid.replace('@c.us', ''), {}, consolidatedQuery) }
         ];
 
         historyRows.forEach(row => {
@@ -1139,8 +1360,8 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
             });
         });
 
-        console.log(`🤖 [PROCESSANDO RESPOSTA IA PARA CLIENTE] De [${customerJid}]...`);
-        broadcastLog('ai', 'Enviando Prompt para a IA', `Provedor: ${config.ACTIVE_PROVIDER || 'OpenAI'}`, '🔵');
+        console.log(`🤖 [PROCESSANDO RESPOSTA IA CONSOLIDADA] De [${customerJid}] (${bufferedMessages.length} msg(s): "${consolidatedQuery.replace(/\n/g, ' | ')}")...`);
+        broadcastLog('ai', 'Enviando Prompt para a IA (Consolidado)', `Provedor: ${config.ACTIVE_PROVIDER || 'OpenAI'} (${bufferedMessages.length} msg(s) agrupada(s))`, '🔵');
 
         const aiReply = await callAIProvider(promptMessages);
 
@@ -1154,13 +1375,34 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
             console.log(`✅ [IA RESPONDEU CLIENTE] Para [${customerJid}]: "${formattedReply}"`);
             broadcastLog('ai', 'IA Respondeu', `Para [${customerJid}]: "${formattedReply.substring(0, 40)}..."`, '🟢');
 
-            await sendBotMessage(customerJid, formattedReply, msg);
+            await sendBotMessage(customerJid, formattedReply, lastMsgObj);
         } else {
             console.error(`⚠️ [ERRO IA] Provedor de IA não retornou conteúdo para [${customerJid}].`);
         }
-
     } catch (e) {
-        console.error('⚠️ Erro no processamento do WhatsApp:', e.message);
+        console.error(`⚠️ Erro ao processar resposta consolidada da IA para [${customerJid}]:`, e.message);
+    } finally {
+        customerProcessingSet.delete(customerJid);
+
+        // Se chegaram novas mensagens de texto enquanto a IA estava gerando resposta, agenda novo ciclo para elas
+        const pendingBuffer = customerDebounceMap.get(customerJid);
+        if (pendingBuffer && pendingBuffer.messages && pendingBuffer.messages.length > 0) {
+            console.log(`🔄 [BUFFER IA] Disparando novo ciclo para ${pendingBuffer.messages.length} nova(s) mensagem(ns) pendente(s) de [${customerJid}]...`);
+            if (pendingBuffer.timer) clearTimeout(pendingBuffer.timer);
+            pendingBuffer.firstTimestamp = Date.now();
+            const settings = getAllSettings();
+            const debounceSeconds = (settings && settings.ai && settings.ai.debounce_seconds)
+                ? Number(settings.ai.debounce_seconds)
+                : 4.0;
+            const delay = Math.max(1000, Math.min(15000, Math.round(debounceSeconds * 1000)));
+
+            pendingBuffer.timer = setTimeout(async () => {
+                const current = customerDebounceMap.get(customerJid);
+                if (!current) return;
+                customerDebounceMap.delete(customerJid);
+                await processConsolidatedAiReply(customerJid, current.lastMsgObj, current.messages);
+            }, delay);
+        }
     }
 }
 
@@ -1178,26 +1420,175 @@ async function resolveSingleLid(targetJidOrNumber) {
         if (!isReady || !client) return { success: false, error: 'WhatsApp não conectado' };
 
         const cleanDigits = targetJidOrNumber.replace(/\D/g, '');
-        const targetJid = targetJidOrNumber.includes('@') ? targetJidOrNumber : `${cleanDigits}@c.us`;
+        if (!cleanDigits) return { success: false, error: 'Número inválido' };
 
-        console.log(`🔍 [RESOLVE SINGLE LID] Buscando LID JID para [${targetJid}]...`);
-        const contactObj = await client.getContactById(targetJid);
-        if (contactObj) {
-            let fetchedLid = '';
-            if (contactObj.lid && (contactObj.lid._serialized || typeof contactObj.lid === 'string')) {
-                fetchedLid = contactObj.lid._serialized || contactObj.lid;
-            } else if (contactObj.id && contactObj.id.lid) {
-                fetchedLid = contactObj.id.lid._serialized || contactObj.id.lid;
-            }
+        // 1. Gerar candidatos de JID (com e sem 9º dígito para telefones do Brasil)
+        const candidates = [];
+        if (targetJidOrNumber.includes('@lid')) {
+            candidates.push(targetJidOrNumber);
+        } else {
+            const primaryJid = targetJidOrNumber.includes('@') ? targetJidOrNumber : `${cleanDigits}@c.us`;
+            candidates.push(primaryJid);
 
-            if (fetchedLid && fetchedLid.includes('@lid')) {
-                const name = contactObj.name || contactObj.pushname || contactObj.shortName || '';
-                saveLidMapping(fetchedLid, targetJid, name);
-                return { success: true, lidJid: fetchedLid, name };
+            // Variação brasileira de 9 dígitos (DDI 55)
+            if (cleanDigits.startsWith('55') && cleanDigits.length === 13) {
+                const noNine = `55${cleanDigits.substring(2, 4)}${cleanDigits.substring(5)}@c.us`;
+                if (!candidates.includes(noNine)) candidates.push(noNine);
+            } else if (cleanDigits.startsWith('55') && cleanDigits.length === 12) {
+                const withNine = `55${cleanDigits.substring(2, 4)}9${cleanDigits.substring(4)}@c.us`;
+                if (!candidates.includes(withNine)) candidates.push(withNine);
             }
         }
-        return { success: false, error: 'LID não retornado pelo WhatsApp' };
+
+        console.log(`🔍 [RESOLVE SINGLE LID] Buscando LID para candidatos:`, candidates);
+
+        let fetchedLid = '';
+        let fetchedPhone = '';
+        let fetchedName = '';
+
+        // TENTATIVA 1: Via Puppeteer evaluate com enforceLidAndPnRetrieval e WAWebApiContact
+        if (client.pupPage) {
+            for (const cand of candidates) {
+                try {
+                    const result = await client.pupPage.evaluate(async (jid) => {
+                        try {
+                            if (window.WWebJS && typeof window.WWebJS.enforceLidAndPnRetrieval === 'function') {
+                                const pair = await window.WWebJS.enforceLidAndPnRetrieval(jid);
+                                if (pair && pair.lid) {
+                                    const lidStr = pair.lid._serialized || pair.lid;
+                                    const phoneStr = pair.phone ? (pair.phone._serialized || pair.phone) : '';
+                                    if (lidStr && String(lidStr).includes('@lid')) {
+                                        return { lid: String(lidStr), phone: String(phoneStr) };
+                                    }
+                                }
+                            }
+
+                            if (window.require) {
+                                const widFactory = window.require('WAWebWidFactory');
+                                const apiContact = window.require('WAWebApiContact');
+                                if (widFactory && apiContact) {
+                                    const wid = widFactory.createWid(jid);
+                                    let lid = wid.server === 'lid' ? wid : apiContact.getCurrentLid(wid);
+                                    let phone = wid.server === 'lid' ? apiContact.getPhoneNumber(wid) : wid;
+
+                                    if (!lid) {
+                                        const queryJob = window.require('WAWebQueryExistsJob');
+                                        if (queryJob) {
+                                            await queryJob.queryWidExists(wid);
+                                            lid = apiContact.getCurrentLid(wid);
+                                        }
+                                    }
+
+                                    if (lid) {
+                                        const lidStr = lid._serialized || lid;
+                                        const phoneStr = phone ? (phone._serialized || phone) : '';
+                                        if (lidStr && String(lidStr).includes('@lid')) {
+                                            return { lid: String(lidStr), phone: String(phoneStr) };
+                                        }
+                                    }
+                                }
+                            }
+                        } catch(e) {}
+                        return null;
+                    }, cand);
+
+                    if (result && result.lid) {
+                        fetchedLid = result.lid;
+                        fetchedPhone = result.phone || cand;
+                        console.log(`✅ [RESOLVE SINGLE LID] Encontrado via enforceLidAndPnRetrieval: ${fetchedLid}`);
+                        break;
+                    }
+                } catch(e) {}
+            }
+        }
+
+        // TENTATIVA 2: Via client.getContactLidAndPhone nativo do whatsapp-web.js
+        if (!fetchedLid && typeof client.getContactLidAndPhone === 'function') {
+            for (const cand of candidates) {
+                try {
+                    const res = await client.getContactLidAndPhone([cand]);
+                    if (res && res[0] && res[0].lid && res[0].lid.includes('@lid')) {
+                        fetchedLid = res[0].lid;
+                        fetchedPhone = res[0].pn || cand;
+                        console.log(`✅ [RESOLVE SINGLE LID] Encontrado via getContactLidAndPhone: ${fetchedLid}`);
+                        break;
+                    }
+                } catch(e) {}
+            }
+        }
+
+        // TENTATIVA 3: Buscar nos chats/mensagens do WhatsApp Web Store
+        if (!fetchedLid && client.pupPage) {
+            try {
+                const storeResult = await client.pupPage.evaluate((digits) => {
+                    try {
+                        const last8 = digits.slice(-8);
+                        if (window.Store && window.Store.Chat) {
+                            const chats = window.Store.Chat.models || window.Store.Chat._models || [];
+                            for (const c of chats) {
+                                const cId = c.id ? (c.id._serialized || c.id) : '';
+                                const cContact = c.contact || {};
+                                const cLid = cContact.lid ? (cContact.lid._serialized || cContact.lid) : '';
+                                const cPhone = cContact.number || (cContact.id && cContact.id.user ? cContact.id.user : '');
+
+                                if (cLid && cPhone && (cPhone.includes(last8) || cPhone === digits)) {
+                                    return { lid: cLid, phone: `${cPhone}@c.us`, name: cContact.name || cContact.pushname || c.name || '' };
+                                }
+                                if (cId.includes('@lid') && (cPhone.includes(last8) || cPhone === digits)) {
+                                    return { lid: cId, phone: `${cPhone}@c.us`, name: cContact.name || cContact.pushname || c.name || '' };
+                                }
+                            }
+                        }
+                    } catch(e) {}
+                    return null;
+                }, cleanDigits);
+
+                if (storeResult && storeResult.lid) {
+                    fetchedLid = storeResult.lid;
+                    fetchedPhone = storeResult.phone || candidates[0];
+                    fetchedName = storeResult.name || '';
+                    console.log(`✅ [RESOLVE SINGLE LID] Encontrado via Store.Chat: ${fetchedLid}`);
+                }
+            } catch(e) {}
+        }
+
+        // TENTATIVA 4: Verificar se já temos mapeado no SQLite
+        if (!fetchedLid) {
+            const mapped = db.prepare("SELECT * FROM lid_mappings WHERE phone_number LIKE ? OR phone_jid = ?").get(`%${cleanDigits.slice(-8)}%`, candidates[0]);
+            if (mapped && mapped.lid) {
+                fetchedLid = mapped.lid;
+                fetchedPhone = mapped.phone_jid || candidates[0];
+                fetchedName = mapped.name || '';
+            }
+        }
+
+        // TENTATIVA 5: Se o próprio parâmetro recebido já for um @lid
+        if (!fetchedLid && targetJidOrNumber.includes('@lid')) {
+            fetchedLid = targetJidOrNumber;
+            fetchedPhone = candidates[0];
+        }
+
+        if (fetchedLid && fetchedLid.includes('@lid')) {
+            if (!fetchedName) {
+                try {
+                    const cObj = await client.getContactById(fetchedPhone || candidates[0]).catch(() => null);
+                    if (cObj) fetchedName = cObj.name || cObj.pushname || cObj.shortName || '';
+                } catch(e) {}
+            }
+            if (!fetchedName) {
+                const row = db.prepare("SELECT name FROM contacts WHERE phone_number LIKE ? OR phone_jid = ?").get(`%${cleanDigits.slice(-8)}%`, candidates[0]);
+                if (row && row.name) fetchedName = row.name;
+            }
+
+            const phoneToSave = fetchedPhone || candidates[0];
+            saveLidMapping(fetchedLid, phoneToSave, fetchedName);
+            console.log(`💾 [RESOLVE SINGLE LID] Sucesso: ${fetchedLid} <-> ${phoneToSave} (${fetchedName})`);
+            return { success: true, lidJid: fetchedLid, phoneJid: phoneToSave, name: fetchedName };
+        }
+
+        return { success: false, error: 'LID não retornado pelo WhatsApp para este contato' };
     } catch (e) {
+        console.error('⚠️ [RESOLVE SINGLE LID ERROR]:', e.message);
         return { success: false, error: e.message };
     }
 }
@@ -1206,14 +1597,93 @@ function getWhatsAppStatus() {
     return {
         connected: isReady,
         number: config.MY_NUMBER,
-        paused: globalIsPaused
+        paused: globalIsPaused,
+        qr: currentQrDataUrl,
+        headless: config.HEADLESS !== false
     };
+}
+
+async function disconnectWhatsApp(user = 'Admin') {
+    try {
+        if (isDisconnecting) {
+            return { success: false, message: 'Processo de desconexão já em andamento...' };
+        }
+        isDisconnecting = true;
+        isReady = false;
+        currentQrRaw = null;
+        currentQrDataUrl = null;
+
+        addAuditLog(user, 'WHATSAPP_DISCONNECT', 'Sessão do WhatsApp desconectada pelo painel web');
+        broadcastLog('security', 'Desconexão Solicitada', 'Encerrando sessão ativa do WhatsApp Web...', '🔴');
+
+        try {
+            await withTimeout(client.logout(), 8000);
+            console.log('✅ [LOGOUT] Logout efetuado no WhatsApp Web.');
+        } catch (errLogout) {
+            console.warn('⚠️ [LOGOUT] client.logout() expirou ou falhou, finalizando via destroy():', errLogout.message);
+            try {
+                await withTimeout(client.destroy(), 4000);
+            } catch (eD) {}
+        }
+
+        // Limpar arquivos de sessão para exigir novo QR code
+        try {
+            const authDir = config.AUTH_DIR;
+            if (fs.existsSync(authDir)) {
+                fs.rmSync(authDir, { recursive: true, force: true });
+                console.log('🧹 [AUTH] Pasta de credenciais .wwebjs_auth removida.');
+            }
+        } catch (eRm) {
+            console.warn('⚠️ Não foi possível limpar pasta .wwebjs_auth:', eRm.message);
+        }
+
+        broadcastLog('system', 'WhatsApp Desconectado', 'Sessão finalizada. Gerando novo QR Code...', '🟡');
+
+        setTimeout(() => {
+            console.log('🔄 [RE-INIT] Inicializando cliente WhatsApp para gerar novo QR Code...');
+            isDisconnecting = false;
+            cleanAuthSession();
+            client.initialize().catch(e => console.error('⚠️ Erro ao reinicializar cliente após desconexão:', e.message));
+        }, 1500);
+
+        return { success: true, message: 'WhatsApp desconectado com sucesso. Novo QR Code em geração.' };
+    } catch (e) {
+        isDisconnecting = false;
+        console.error('⚠️ Erro ao desconectar WhatsApp:', e.message);
+        return { success: false, error: e.message };
+    }
+}
+
+async function reconnectWhatsApp(user = 'Admin') {
+    try {
+        isReady = false;
+        currentQrRaw = null;
+        currentQrDataUrl = null;
+        addAuditLog(user, 'WHATSAPP_RECONNECT', 'Reinicialização do WhatsApp solicitada pelo painel web');
+        broadcastLog('system', 'Reconexão Solicitada', 'Reiniciando instância do WhatsApp Web...', '🔵');
+
+        try {
+            await withTimeout(client.destroy(), 4000);
+        } catch (e) {}
+
+        cleanAuthSession();
+
+        setTimeout(() => {
+            client.initialize().catch(e => console.error('⚠️ Erro ao reiniciar WhatsApp:', e.message));
+        }, 1500);
+
+        return { success: true, message: 'Reconexão iniciada.' };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
 }
 
 module.exports = {
     client,
     sendBotMessage,
     getWhatsAppStatus,
+    disconnectWhatsApp,
+    reconnectWhatsApp,
     syncWhatsAppContacts,
     resolveSingleLid,
     buildSystemPrompt

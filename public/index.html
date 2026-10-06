@@ -3,27 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloud AI - Plataforma Enterprise Comercial WhatsApp</title>
+    <title>Atendimento IA - WhatsApp Comercial Cloud</title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#3b82f6">
-    <link rel="stylesheet" href="/css/dashboard.css?v=15">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="stylesheet" href="/css/dashboard.css?v=17">
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
 
     <!-- ONBOARDING WIZARD OVERLAY (PRIMEIRO ACESSO) -->
     <div class="modal-backdrop" id="wizard-modal">
-        <div class="modal-box" style="max-width: 650px;">
-            <h2>🧙 Assistente de Configuração Inicial (Onboarding)</h2>
-            <p style="color:var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">Configure sua empresa e plataforma de IA em 5 passos rápidos.</p>
+        <div class="modal-box" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>Configuração Inicial</h2>
+            </div>
+            <p style="color:var(--text-muted); margin-bottom: 1.25rem; font-size: 0.85rem;">Configure sua empresa e a inteligência artificial para iniciar os atendimentos.</p>
 
             <form id="form-wizard">
                 <div style="margin-bottom: 1.25rem;">
                     <label style="font-weight:600; font-size:0.85rem; color:var(--accent-blue);">1. Nome da Empresa & Segmento</label>
                     <div style="display:flex; gap:0.75rem; margin-top:0.5rem;">
-                        <input type="text" class="form-control" style="margin-bottom:0;" placeholder="Nome da Empresa (ex: Clínica Alex)" id="w-company-name" required>
+                        <input type="text" class="form-control" style="margin-bottom:0;" placeholder="Nome da Empresa (ex: Inova Soluções)" id="w-company-name" required>
                         <input type="text" class="form-control" style="margin-bottom:0;" placeholder="Segmento (ex: Medicina, Advocacia)" id="w-segment" required>
                     </div>
                 </div>
@@ -48,7 +51,7 @@
 
                 <div style="margin-bottom: 1.5rem;">
                     <label style="font-weight:600; font-size:0.85rem; color:var(--accent-blue);">4. Mensagem de Ausência Automática</label>
-                    <textarea class="form-control" style="margin-top:0.5rem;" id="w-absence-msg">Olá! Nosso atendimento funciona de 08:00 às 18:00. O Alex responderá assim que possível!</textarea>
+                    <textarea class="form-control" style="margin-top:0.5rem;" id="w-absence-msg">Olá! Nosso atendimento funciona de 08:00 às 18:00. Nossa equipe responderá assim que possível!</textarea>
                 </div>
 
                 <button type="submit" class="btn btn-primary" style="width:100%; padding:0.85rem;">🚀 Concluir Configuração e Entrar no Painel</button>
@@ -56,61 +59,150 @@
         </div>
     </div>
 
-    <!-- SIDEBAR -->
+    <!-- SIDEBAR NO PADRÃO CASTRODRIVE -->
     <aside class="sidebar">
-        <div class="brand">
-            <div class="brand-icon">⚡</div>
-            <div>
-                <div class="brand-title">Agente pessoal</div>
-                <div class="brand-sub">IA Conversation</div>
+        <div>
+            <div class="brand">
+                <div class="brand-icon">
+                    <i data-lucide="bot" style="width: 18px; height: 18px; color: #ffffff;"></i>
+                </div>
+                <div class="brand-text">
+                    <div class="brand-title">Atendimento IA</div>
+                    <div class="brand-sub">WhatsApp Cloud</div>
+                </div>
+            </div>
+
+            <div class="sidebar-scroll">
+                <!-- GRUPO 1: PRINCIPAL -->
+                <div class="nav-section">
+                    <div class="nav-section-title">Principal</div>
+                    <ul class="nav-list">
+                        <li class="nav-item">
+                            <button class="nav-btn active" data-tab="tab-dashboard">
+                                <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span>
+                                Dashboard Executivo
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-btn" data-tab="tab-chats">
+                                <span class="nav-icon"><i data-lucide="message-square"></i></span>
+                                Conversas ao Vivo
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- GRUPO 2: INTELIGÊNCIA ARTIFICIAL -->
+                <div class="nav-section">
+                    <div class="nav-section-title">Inteligência Artificial</div>
+                    <ul class="nav-list">
+                        <li class="nav-item">
+                            <button class="nav-btn" data-tab="tab-training">
+                                <span class="nav-icon"><i data-lucide="brain"></i></span>
+                                Central de Treinamento
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-btn" data-tab="tab-marketplace">
+                                <span class="nav-icon"><i data-lucide="package"></i></span>
+                                Marketplace Prompts
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-btn" data-tab="tab-playground">
+                                <span class="nav-icon"><i data-lucide="flask-conical"></i></span>
+                                Playground LLM
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- GRUPO 3: SISTEMA & OPERAÇÕES -->
+                <div class="nav-section">
+                    <div class="nav-section-title">Sistema & Operações</div>
+                    <ul class="nav-list">
+                        <li class="nav-item">
+                            <button class="nav-btn" data-tab="tab-automations">
+                                <span class="nav-icon"><i data-lucide="calendar"></i></span>
+                                Automações
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-btn" data-tab="tab-noc">
+                                <span class="nav-icon"><i data-lucide="activity"></i></span>
+                                NOC Monitor
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-btn" data-tab="tab-logs">
+                                <span class="nav-icon"><i data-lucide="zap"></i></span>
+                                Feed de Eventos
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- GRUPO 4: DADOS & SEGURANÇA -->
+                <div class="nav-section">
+                    <div class="nav-section-title">Dados & Segurança</div>
+                    <ul class="nav-list">
+                        <li class="nav-item">
+                            <button class="nav-btn" data-tab="tab-contacts">
+                                <span class="nav-icon"><i data-lucide="users"></i></span>
+                                Contatos & Blacklist
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-btn" data-tab="tab-memories">
+                                <span class="nav-icon"><i data-lucide="sparkles"></i></span>
+                                Memórias & Perfil
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-btn" data-tab="tab-rag">
+                                <span class="nav-icon"><i data-lucide="folder-kanban"></i></span>
+                                Base RAG (Documentos)
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-btn" data-tab="tab-audit">
+                                <span class="nav-icon"><i data-lucide="shield-alert"></i></span>
+                                Auditoria
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-btn" data-tab="tab-settings">
+                                <span class="nav-icon"><i data-lucide="settings"></i></span>
+                                Configurações Gerais
+                            </button>
+                        </li>
+                    </ul>
+                </div>
             </div>
         </div>
 
-        <div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column;">
-            <!-- GRUPO 1: PRINCIPAL -->
-            <div class="nav-section">
-                <div class="nav-section-title">🏠 Principal</div>
-                <ul class="nav-list">
-                    <li class="nav-item"><button class="nav-btn active" data-tab="tab-dashboard"><span>📊</span> Dashboard Executivo</button></li>
-                    <li class="nav-item"><button class="nav-btn" data-tab="tab-chats"><span>💬</span> Conversas ao Vivo</button></li>
-                </ul>
+        <!-- WIDGET TELEMETRIA NA SIDEBAR ESTILO CASTRODRIVE -->
+        <div class="sidebar-footer">
+            <div class="sidebar-status-card">
+                <div class="status-card-header">
+                    <span class="status-card-title">
+                        <i data-lucide="cpu" style="width: 14px; height: 14px; color: var(--brand-blue);"></i> Status da IA
+                    </span>
+                    <span class="status-badge-active">
+                        <i data-lucide="check-circle" style="width: 10px; height: 10px;"></i> Ativo
+                    </span>
+                </div>
+                <div class="status-progress-track">
+                    <div class="status-progress-fill" id="sidebar-progress-bar"></div>
+                </div>
+                <div class="status-card-meta">
+                    <span>Provedor:</span>
+                    <strong id="sidebar-provider-label">Multi-LLM</strong>
+                </div>
             </div>
-
-            <!-- GRUPO 2: INTELIGÊNCIA ARTIFICIAL -->
-            <div class="nav-section">
-                <div class="nav-section-title">🤖 Inteligência Artificial</div>
-                <ul class="nav-list">
-                    <li class="nav-item"><button class="nav-btn" data-tab="tab-prompts"><span>🤖</span> Prompts & Agentes</button></li>
-                    <li class="nav-item"><button class="nav-btn" data-tab="tab-training"><span>🧠</span> Central de Treinamento</button></li>
-                    <li class="nav-item"><button class="nav-btn" data-tab="tab-marketplace"><span>📦</span> Marketplace Prompts</button></li>
-                    <li class="nav-item"><button class="nav-btn" data-tab="tab-playground"><span>🧪</span> Playground LLM</button></li>
-                </ul>
-            </div>
-
-            <!-- GRUPO 3: SISTEMA & OPERAÇÕES -->
-            <div class="nav-section">
-                <div class="nav-section-title">⚙️ Sistema & Operações</div>
-                <ul class="nav-list">
-                    <li class="nav-item"><button class="nav-btn" data-tab="tab-automations"><span>📅</span> Automações</button></li>
-                    <li class="nav-item"><button class="nav-btn" data-tab="tab-noc"><span>👁️</span> NOC Real-Time Monitor</button></li>
-                    <li class="nav-item"><button class="nav-btn" data-tab="tab-logs"><span>⚡</span> Feed de Eventos</button></li>
-                </ul>
-            </div>
-
-            <!-- GRUPO 4: DADOS & SEGURANÇA -->
-            <div class="nav-section">
-                <div class="nav-section-title">🧠 Dados & Segurança</div>
-                <ul class="nav-list">
-                    <li class="nav-item"><button class="nav-btn" data-tab="tab-contacts"><span>👤</span> Contatos & Blacklist</button></li>
-                    <li class="nav-item"><button class="nav-btn" data-tab="tab-memories"><span>🧠</span> Memórias & Perfil</button></li>
-                    <li class="nav-item"><button class="nav-btn" data-tab="tab-rag"><span>📂</span> Base RAG (Documentos)</button></li>
-                    <li class="nav-item"><button class="nav-btn" data-tab="tab-audit"><span>📜</span> Auditoria (Git)</button></li>
-                </ul>
-            </div>
-        </div>
-
-        <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--border-color);">
-            <button class="btn btn-danger" style="width: 100%; font-size: 0.8rem;" id="btn-killswitch">🔴 Kill Switch</button>
+            <button class="btn btn-danger btn-sm" style="width: 100%;" id="btn-killswitch" title="Encerrar processo do servidor">
+                <i data-lucide="power" style="width: 13px; height: 13px;"></i> Encerrar Sessão
+            </button>
         </div>
     </aside>
 
@@ -122,7 +214,8 @@
                     <span>Plataforma</span> / <span class="active" id="current-page-breadcrumb">Dashboard Executivo</span>
                 </div>
                 <div class="search-trigger" id="btn-search-trigger">
-                    <span>🔍 Busca Global Notion-style (Ctrl + K)...</span>
+                    <i data-lucide="search" style="width: 15px; height: 15px; color: var(--text-subtle); flex-shrink: 0;"></i>
+                    <span>Buscar contatos, histórico e memórias...</span>
                     <span class="kbd-badge">Ctrl K</span>
                 </div>
             </div>
@@ -133,116 +226,144 @@
                     <div class="pill"><span class="status-dot"></span> WhatsApp</div>
                     <div class="pill"><span class="status-dot"></span> Multi-LLM</div>
                 </div>
-                <div class="user-avatar" title="Alex (Proprietário)">A</div>
+                <button class="btn btn-secondary btn-sm" id="btn-theme-toggle" title="Alternar tema de cor (Cinza / Escuro)" style="display:flex; align-items:center; gap:0.4rem; padding:0.45rem 0.8rem; font-size:0.78rem; font-weight:600; border-radius:8px;">
+                    <i data-lucide="moon" style="width:14px; height:14px;" id="theme-toggle-icon"></i>
+                    <span id="theme-toggle-label">Modo Escuro</span>
+                </button>
             </div>
         </header>
 
         <main class="content-body">
 
-            <!-- TAB 1: DASHBOARD EXECUTIVO & ANALYTICS DE NEGÓCIO -->
+            <!-- TAB 1: DASHBOARD EXECUTIVO & PERFORMANCE -->
             <section id="tab-dashboard" class="tab-pane active">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <div class="page-header">
                     <div>
-                        <h1 style="font-size: 1.6rem; font-weight: 800; letter-spacing: -0.03em;">📊 Dashboard Executivo & Performance</h1>
-                        <p style="color: var(--text-muted); font-size: 0.88rem; margin-top: 0.2rem;">Métricas de atendimento comercial e telemetria da inteligência artificial em tempo real.</p>
+                        <h1>Dashboard Executivo</h1>
+                        <p>Métricas de atendimento comercial e telemetria da inteligência artificial em tempo real.</p>
                     </div>
                 </div>
 
-                <!-- 1. CARDS HERO (NÚMEROS ENORMES E IMPACTANTES) -->
+                <!-- 1. CARDS HERO (PADRÃO CASTRODRIVE DASHBOARDMETRICS) -->
                 <div class="grid-4">
-                    <div class="card">
-                        <div class="card-label">
-                            <span>Leads Atendidos</span>
-                            <span class="badge-tag badge-cyan">+18% hoje</span>
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <span class="metric-label">Leads Atendidos</span>
+                            <div class="metric-icon-box blue">
+                                <i data-lucide="users" style="width: 18px; height: 18px;"></i>
+                            </div>
                         </div>
-                        <div class="card-value-hero" id="dash-total-leads">0</div>
-                        <div class="card-subtitle">Contatos qualificados no WhatsApp</div>
+                        <div class="metric-value-hero" id="dash-total-leads">0</div>
+                        <div class="metric-footer">
+                            <span class="badge-tag badge-blue">+18% hoje</span>
+                            <span>Contatos no WhatsApp</span>
+                        </div>
                     </div>
-                    <div class="card">
-                        <div class="card-label">
-                            <span>Autonomia da IA</span>
+
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <span class="metric-label">Autonomia da IA</span>
+                            <div class="metric-icon-box emerald">
+                                <i data-lucide="bot" style="width: 18px; height: 18px;"></i>
+                            </div>
+                        </div>
+                        <div class="metric-value-hero" id="dash-ai-rate">100%</div>
+                        <div class="metric-footer">
                             <span class="badge-tag badge-emerald">100% resolvido</span>
+                            <span>Sem intervenção</span>
                         </div>
-                        <div class="card-value-hero" id="dash-ai-rate">100%</div>
-                        <div class="card-subtitle">Conversas resolvidas sem operador</div>
                     </div>
-                    <div class="card">
-                        <div class="card-label">
-                            <span>Economia Estimada</span>
+
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <span class="metric-label">Economia Estimada</span>
+                            <div class="metric-icon-box purple">
+                                <i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
+                            </div>
+                        </div>
+                        <div class="metric-value-hero" id="dash-cost-saved">R$ 0,00</div>
+                        <div class="metric-footer">
                             <span class="badge-tag badge-purple">vs Humano</span>
+                            <span>Redução operacional</span>
                         </div>
-                        <div class="card-value-hero" id="dash-cost-saved">R$ 0,00</div>
-                        <div class="card-subtitle">Redução direta de custos operacionais</div>
                     </div>
-                    <div class="card">
-                        <div class="card-label">
-                            <span>Custo IA Hoje</span>
-                            <span class="badge-tag badge-amber" id="dash-tokens-today">0 tokens</span>
+
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <span class="metric-label">Custo IA Hoje</span>
+                            <div class="metric-icon-box amber">
+                                <i data-lucide="zap" style="width: 18px; height: 18px;"></i>
+                            </div>
                         </div>
-                        <div class="card-value-hero" id="dash-cost-today">R$ 0,00</div>
-                        <div class="card-subtitle">Consumo de tokens no provedor ativo</div>
+                        <div class="metric-value-hero" id="dash-cost-today">R$ 0,00</div>
+                        <div class="metric-footer">
+                            <span class="badge-tag badge-amber" id="dash-tokens-today">0 tokens</span>
+                            <span>Provedor ativo</span>
+                        </div>
                     </div>
                 </div>
 
-                <!-- 2. VERCEL-STYLE HORIZONTAL HEALTH BOARD BAR -->
-                <div style="margin-bottom: 1.75rem;">
-                    <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 0.6rem;">Status dos Serviços em Tempo Real</div>
+                <!-- 2. HEALTH BOARD BAR -->
+                <div style="margin-bottom: 1.5rem;">
+                    <div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.5rem;">Status dos Serviços em Tempo Real</div>
                     <div class="health-board-bar" id="health-board-grid"></div>
                 </div>
 
-                <!-- 3. PREENCHIMENTO ENTERPRISE DAS SEÇÕES INFERIORES -->
-                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+                <!-- 3. LIVE EVENTOS & TELEMETRIA IA -->
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.25rem;">
                     
                     <!-- LADO ESQUERDO: LIVE EVENTOS -->
-                    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-                        <div class="card">
-                            <div class="card-label" style="margin-bottom: 1rem;">
-                                <span style="font-size: 0.95rem; color: #fff; text-transform: none; font-weight: 700;">🔥 Últimos Eventos em Tempo Real</span>
-                                <span class="badge-tag badge-cyan">Ao Vivo</span>
+                    <div class="card">
+                        <div class="card-header-flex">
+                            <div>
+                                <div class="card-title">
+                                    <i data-lucide="activity" style="width: 16px; height: 16px; color: var(--brand-blue);"></i> Últimos Eventos
+                                </div>
+                                <div class="card-desc" style="margin-bottom: 0;">Feed ao vivo das ações registradas no atendimento</div>
                             </div>
-                            <div style="max-height: 280px; overflow-y: auto;">
-                                <table class="data-table" style="margin-top: 0;">
-                                    <thead>
-                                        <tr>
-                                            <th>Hora</th>
-                                            <th>Evento / Ação</th>
-                                            <th>Detalhes</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="dash-live-events-body">
-                                        <tr>
-                                            <td colspan="3" style="color:var(--text-muted);">Carregando feed de eventos ao vivo...</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
+                            <span class="badge-tag badge-blue">Ao Vivo</span>
+                        </div>
+                        <div class="table-container" style="max-height: 280px; overflow-y: auto;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Hora</th>
+                                        <th>Evento / Ação</th>
+                                        <th>Detalhes</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dash-live-events-body">
+                                    <tr>
+                                        <td colspan="3" style="color:var(--text-muted); text-align:center; padding: 1.5rem;">Carregando feed de eventos ao vivo...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
-                    <!-- LADO DIREITO: TELEMETRIA DA IA EM TEMPO REAL -->
-                    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-                        <div class="card">
-                            <div class="card-label" style="margin-bottom: 1rem;">
-                                <span style="font-size: 0.95rem; color: #fff; text-transform: none; font-weight: 700;">🤖 Telemetria da IA</span>
-                                <span class="badge-tag badge-purple">Stats</span>
+                    <!-- LADO DIREITO: TELEMETRIA DA IA -->
+                    <div class="card">
+                        <div class="card-header-flex">
+                            <div>
+                                <div class="card-title">
+                                    <i data-lucide="cpu" style="width: 16px; height: 16px; color: var(--brand-purple);"></i> Telemetria da IA
+                                </div>
+                                <div class="card-desc" style="margin-bottom: 0;">Métricas em tempo real da engine neural</div>
                             </div>
-                            <div style="display: flex; flex-direction: column; gap: 1rem;">
-                                <div style="display: flex; justify-content: space-between; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color);">
-                                    <span style="color: var(--text-secondary); font-size: 0.85rem;">Provedor Ativo:</span>
-                                    <strong style="color: var(--brand-cyan);" id="dash-stat-provider">OpenAI (GPT-4o mini)</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color);">
-                                    <span style="color: var(--text-secondary); font-size: 0.85rem;">Latência Média:</span>
-                                    <strong style="color: var(--brand-emerald);" id="dash-stat-latency">450 ms</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color);">
-                                    <span style="color: var(--text-secondary); font-size: 0.85rem;">Tokens Consumidos:</span>
-                                    <strong style="color: #fff;" id="dash-stat-tokens">12.450</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between;">
-                                    <span style="color: var(--text-secondary); font-size: 0.85rem;">Agente Ativo:</span>
-                                    <strong style="color: var(--brand-purple);" id="dash-stat-agent">Especialista em Vendas</strong>
-                                </div>
+                            <span class="badge-tag badge-purple">Stats</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+                            <div style="display: flex; justify-content: space-between; padding-bottom: 0.65rem; border-bottom: 1px solid var(--border-color); font-size: 0.84rem;">
+                                <span style="color: var(--text-muted);">Provedor Ativo:</span>
+                                <strong style="color: var(--brand-blue);" id="dash-stat-provider">OpenAI (GPT-4o mini)</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding-bottom: 0.65rem; border-bottom: 1px solid var(--border-color); font-size: 0.84rem;">
+                                <span style="color: var(--text-muted);">Latência Média:</span>
+                                <strong style="color: var(--brand-emerald-text);" id="dash-stat-latency">450 ms</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.84rem;">
+                                <span style="color: var(--text-muted);">Tokens Consumidos:</span>
+                                <strong style="color: var(--text-primary);" id="dash-stat-tokens">0</strong>
                             </div>
                         </div>
                     </div>
@@ -253,46 +374,92 @@
 
             <!-- TAB NOC REAL-TIME MONITOR -->
             <section id="tab-noc" class="tab-pane">
-                <h2>👁️ Monitor de Operações em Tempo Real estilo NOC</h2>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 1.5rem;">
-                    <div class="card" style="border-left: 4px solid var(--accent-green);">
-                        <h3>🤖 Engine de IA (Cloud)</h3>
-                        <div style="font-size:1.5rem; font-weight:700; color:var(--accent-green); margin:0.75rem 0;">🟢 Respondendo</div>
-                        <div style="font-size:0.85rem; color:var(--text-secondary);" id="noc-llm-details">Latência Média: 450ms</div>
+                <div class="page-header">
+                    <div>
+                        <h1>Monitor NOC em Tempo Real</h1>
+                        <p>Acompanhamento de disponibilidade e latência da infraestrutura de atendimento.</p>
                     </div>
-                    <div class="card" style="border-left: 4px solid var(--accent-blue);">
-                        <h3>📲 WhatsApp Connection</h3>
-                        <div style="font-size:1.5rem; font-weight:700; color:var(--accent-blue); margin:0.75rem 0;">🟢 Conectado</div>
-                        <div style="font-size:0.85rem; color:var(--text-secondary);">Sessão Ativa no Celular</div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;">
+                    <div class="card" style="border-left: 4px solid var(--brand-emerald);">
+                        <div class="card-title">
+                            <i data-lucide="cpu" style="width: 18px; height: 18px; color: var(--brand-emerald);"></i> Engine de IA (Cloud)
+                        </div>
+                        <div style="font-size: 1.4rem; font-weight: 800; color: var(--brand-emerald-text); margin: 0.6rem 0;">Respondendo</div>
+                        <div style="font-size: 0.82rem; color: var(--text-muted);" id="noc-llm-details">Latência Média: 450ms</div>
                     </div>
-                    <div class="card" style="border-left: 4px solid var(--accent-purple);">
-                        <h3>⏰ Disparador de Automações</h3>
-                        <div style="font-size:1.5rem; font-weight:700; color:var(--accent-purple); margin:0.75rem 0;">🟢 Ativo</div>
-                        <div style="font-size:0.85rem; color:var(--text-secondary);">Verificação a cada 60s</div>
+                    <div class="card" style="border-left: 4px solid var(--brand-blue);" id="noc-card-wa">
+                        <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="display: flex; align-items: center; gap: 0.45rem;">
+                                <i data-lucide="smartphone" style="width: 18px; height: 18px; color: var(--brand-blue);"></i> WhatsApp Connection
+                            </span>
+                            <span class="badge-tag badge-emerald" id="noc-wa-badge">🟢 Conectado</span>
+                        </div>
+                        <div style="font-size: 1.35rem; font-weight: 800; color: var(--brand-blue-text); margin: 0.5rem 0;" id="noc-wa-state">Conectado</div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;" id="noc-wa-details">Sessão em segundo plano (Headless)</div>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <button type="button" class="btn btn-secondary btn-sm" id="btn-noc-disconnect-wa" style="color: #ef4444; border-color: rgba(239,68,68,0.3); font-size: 0.75rem; padding: 0.3rem 0.6rem;">
+                                <i data-lucide="log-out" style="width: 12px; height: 12px;"></i> Desconectar
+                            </button>
+                            <button type="button" class="btn btn-primary btn-sm" id="btn-noc-view-qr" style="display: none; font-size: 0.75rem; padding: 0.3rem 0.6rem;">
+                                <i data-lucide="qr-code" style="width: 12px; height: 12px;"></i> Escanear QR Code
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card" style="border-left: 4px solid var(--brand-purple);">
+                        <div class="card-title">
+                            <i data-lucide="clock" style="width: 18px; height: 18px; color: var(--brand-purple);"></i> Agendador de Automações
+                        </div>
+                        <div style="font-size: 1.4rem; font-weight: 800; color: var(--brand-purple); margin: 0.6rem 0;">Ativo</div>
+                        <div style="font-size: 0.82rem; color: var(--text-muted);">Verificação periódica a cada 60s</div>
                     </div>
                 </div>
             </section>
 
             <!-- TAB 2: CONVERSAS AO VIVO & ATENDIMENTO MANUAL -->
             <section id="tab-chats" class="tab-pane">
-                <h2>💬 Conversas & Atendimento Manual</h2>
-                <div style="display: flex; gap: 1.5rem; height: calc(100vh - 180px); margin-top: 1rem;">
-                    <div style="width: 320px; background: var(--bg-card); border-radius: 12px; padding: 1rem; overflow-y: auto;">
-                        <input type="text" class="form-control" placeholder="Buscar chat..." id="chat-search-input">
-                        <div id="chats-list-container"></div>
+                <div class="page-header" style="margin-bottom: 1rem;">
+                    <div>
+                        <h1>Conversas & Atendimento Manual</h1>
+                        <p>Acompanhe em tempo real ou assuma o controle direto de qualquer conversa do WhatsApp.</p>
                     </div>
-                    <div style="flex: 1; background: var(--bg-card); border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color);">
-                            <h3 id="active-chat-title">Selecione uma conversa</h3>
+                </div>
+                <div class="chat-split-container">
+                    <!-- LISTA DE CHATS À ESQUERDA -->
+                    <div class="chat-sidebar-list">
+                        <div style="position: relative; margin-bottom: 0.65rem;">
+                            <input type="text" class="form-control" style="margin-bottom: 0; padding-left: 2rem; font-size: 0.82rem;" placeholder="Filtrar conversas..." id="chat-search-input">
+                            <i data-lucide="search" style="position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-subtle);"></i>
+                        </div>
+                        <div id="chats-list-container" style="flex: 1; overflow-y: auto;"></div>
+                    </div>
+
+                    <!-- ÁREA DA CONVERSA SELECIONADA À DIREITA -->
+                    <div class="chat-conversation-area">
+                        <div class="chat-header">
+                            <div>
+                                <h3 id="active-chat-title" style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">Selecione uma conversa</h3>
+                                <div style="font-size: 0.76rem; color: var(--text-muted);">Histórico de mensagens sincronizado</div>
+                            </div>
                             <div style="display: flex; gap: 0.5rem;">
-                                <button class="btn btn-danger" id="btn-clear-chat-history" style="font-size:0.8rem;">🧹 Apagar Histórico</button>
-                                <button class="btn btn-primary" id="btn-toggle-manual" style="font-size:0.8rem;">👤 Assumir Atendimento Manual</button>
+                                <button class="btn btn-secondary btn-sm" id="btn-clear-chat-history">
+                                    <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Limpar Histórico
+                                </button>
+                                <button class="btn btn-primary btn-sm" id="btn-toggle-manual">
+                                    <i data-lucide="user-check" style="width: 14px; height: 14px;"></i> Assumir Manualmente
+                                </button>
                             </div>
                         </div>
-                        <div style="flex: 1; overflow-y: auto; padding: 1rem 0;" id="chat-messages-container"></div>
-                        <div style="display: flex; gap: 0.75rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
-                            <input type="text" class="form-control" style="margin-bottom: 0;" placeholder="Digite uma mensagem para enviar..." id="chat-reply-input">
-                            <button class="btn btn-primary" id="btn-send-chat-reply">Enviar</button>
+                        <div class="chat-messages-scroll" id="chat-messages-container">
+                            <div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; margin-top: 2rem;">
+                                Selecione um contato na lista ao lado para carregar a conversa.
+                            </div>
+                        </div>
+                        <div class="chat-reply-bar">
+                            <input type="text" class="form-control" style="margin-bottom: 0;" placeholder="Digite uma mensagem para responder pelo WhatsApp..." id="chat-reply-input">
+                            <button class="btn btn-primary" id="btn-send-chat-reply">
+                                <i data-lucide="send" style="width: 15px; height: 15px;"></i> Enviar
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -300,216 +467,827 @@
 
             <!-- TAB RAG BASE DE CONHECIMENTO -->
             <section id="tab-rag" class="tab-pane">
-                <h2>📂 Base de Conhecimento RAG (PDFs, TXT & URLs)</h2>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1rem;">
-                    <div class="card">
-                        <h3>➕ Indexar Novo Documento ou URL</h3>
-                        <form id="form-add-rag-doc" style="margin-top: 1rem;">
-                            <input type="text" class="form-control" placeholder="Título (ex: Contrato Comercial ou Tabela de Preços)" id="rag-title-input" required>
-                            <select class="form-control" id="rag-type-input">
-                                <option value="txt">Texto / Manual</option>
-                                <option value="pdf">Documento PDF</option>
-                                <option value="url">URL do Site</option>
-                            </select>
-                            <textarea class="form-control" style="height:120px;" placeholder="Conteúdo do documento ou texto..." id="rag-content-input" required></textarea>
-                            <button type="submit" class="btn btn-primary">Indexar no RAG</button>
-                        </form>
+                <div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h1>Base de Conhecimento RAG</h1>
+                        <p>Upload de planilhas (Excel/CSV) e documentos (PDF, Word, TXT) para recuperação contextual da IA.</p>
+                    </div>
+                    <div style="display: flex; gap: 0.75rem;">
+                        <span class="status-pill-indicator" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-secondary);">
+                            <i data-lucide="database" style="width: 14px; height: 14px; color: var(--brand-blue);"></i>
+                            <span id="rag-total-docs-count">0</span> docs / <span id="rag-total-chunks-count">0</span> blocos
+                        </span>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 1.25rem;">
+                    <!-- COLUNA ESQUERDA: INGESTÃO E TESTE -->
+                    <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+                        <!-- CARD DE INGESTÃO -->
+                        <div class="card">
+                            <div class="card-title">
+                                <i data-lucide="upload-cloud" style="width: 16px; height: 16px; color: var(--brand-blue);"></i> Ingestão de Documentos & Planilhas
+                            </div>
+                            <div class="card-desc">Carregue arquivos para fragmentação automática em blocos semânticos.</div>
+
+                            <!-- Abas de seleção de modo -->
+                            <div class="rag-segmented-control">
+                                <button type="button" class="rag-segmented-btn active" id="rag-tab-upload-btn" onclick="switchRagMode('upload')">
+                                    <i data-lucide="file-up" style="width: 14px; height: 14px;"></i> Upload de Arquivos
+                                </button>
+                                <button type="button" class="rag-segmented-btn" id="rag-tab-manual-btn" onclick="switchRagMode('manual')">
+                                    <i data-lucide="file-text" style="width: 14px; height: 14px;"></i> Texto Manual
+                                </button>
+                            </div>
+
+                            <!-- MODO 1: UPLOAD DE ARQUIVOS (EXCEL, PDF, WORD, TXT) -->
+                            <div id="rag-upload-panel">
+                                <div class="rag-dropzone" id="rag-dropzone" onclick="document.getElementById('rag-file-input').click()">
+                                    <input type="file" id="rag-file-input" multiple accept=".xlsx,.xls,.csv,.pdf,.docx,.txt" style="display: none;">
+                                    <div class="rag-dropzone-icon">
+                                        <i data-lucide="folder-up" style="width: 24px; height: 24px;"></i>
+                                    </div>
+                                    <div class="rag-dropzone-title">Arraste e solte planilhas ou documentos aqui</div>
+                                    <div class="rag-dropzone-subtitle">ou clique para procurar no seu computador (até 25MB por arquivo)</div>
+                                    <div class="rag-formats-pill-group">
+                                        <span class="rag-format-tag" style="color: #15803d; border-color: #bbf7d0;">.XLSX</span>
+                                        <span class="rag-format-tag" style="color: #15803d; border-color: #bbf7d0;">.XLS</span>
+                                        <span class="rag-format-tag" style="color: #15803d; border-color: #bbf7d0;">.CSV</span>
+                                        <span class="rag-format-tag" style="color: #b91c1c; border-color: #fecaca;">.PDF</span>
+                                        <span class="rag-format-tag" style="color: #1d4ed8; border-color: #bfdbfe;">.DOCX</span>
+                                        <span class="rag-format-tag">.TXT</span>
+                                    </div>
+                                </div>
+                                <div id="rag-upload-status" style="margin-top: 0.75rem; font-size: 0.82rem; display: none;"></div>
+                                
+                                <div style="margin-top: 1rem;">
+                                    <label class="form-label" style="display:flex; justify-content:space-between; align-items:center;">
+                                        <span>Palavras-Gatilho / Tags de Ativação (Opcional)</span>
+                                        <span style="font-size:0.72rem; color:var(--text-muted); font-weight:normal;">Prioridade máxima no WhatsApp</span>
+                                    </label>
+                                    <input type="text" class="form-control" style="margin-bottom:0.4rem; font-size:0.83rem;" placeholder="Ex: preço, valor, quanto custa, tabela, orçamento (separados por vírgula)" id="rag-file-keywords">
+                                    <div style="display:flex; gap:0.35rem; flex-wrap:wrap; align-items:center;">
+                                        <span style="font-size:0.72rem; color:var(--text-muted);">Sugestões:</span>
+                                        <span class="rag-suggest-pill" onclick="appendRagKeyword('rag-file-keywords', 'preço, valor, quanto custa, orçamento, tabela')">+ Preços & Orçamento</span>
+                                        <span class="rag-suggest-pill" onclick="appendRagKeyword('rag-file-keywords', 'garantia, troca, devolução, prazo, estorno')">+ Garantia & Pós-Venda</span>
+                                        <span class="rag-suggest-pill" onclick="appendRagKeyword('rag-file-keywords', 'horário, agendamento, consulta, endereço')">+ Agendamento & Local</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- MODO 2: TEXTO MANUAL -->
+                            <div id="rag-manual-panel" style="display: none;">
+                                <form id="form-add-rag-manual">
+                                    <label class="form-label">Título do Documento / Manual</label>
+                                    <input type="text" class="form-control" placeholder="ex: Políticas de Garantia e Devolução" id="rag-manual-title" required>
+
+                                    <label class="form-label">Conteúdo do Documento</label>
+                                    <textarea class="form-control" style="height: 120px; font-size: 0.83rem;" placeholder="Cole o texto, termos ou procedimentos..." id="rag-manual-content" required></textarea>
+
+                                    <label class="form-label">Palavras-Gatilho / Tags de Ativação (Opcional)</label>
+                                    <input type="text" class="form-control" style="margin-bottom:0.4rem; font-size:0.83rem;" placeholder="Ex: garantia, troca, cancelamento, prazo (separados por vírgula)" id="rag-manual-keywords">
+                                    <div style="display:flex; gap:0.35rem; flex-wrap:wrap; align-items:center; margin-bottom:0.85rem;">
+                                        <span style="font-size:0.72rem; color:var(--text-muted);">Sugestões:</span>
+                                        <span class="rag-suggest-pill" onclick="appendRagKeyword('rag-manual-keywords', 'preço, valor, quanto custa, orçamento')">+ Preços</span>
+                                        <span class="rag-suggest-pill" onclick="appendRagKeyword('rag-manual-keywords', 'garantia, devolução, prazo')">+ Garantia</span>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-primary" style="width: 100%;" id="btn-save-rag-manual">
+                                        <i data-lucide="plus" style="width: 14px; height: 14px;"></i> Indexar Texto no RAG
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- CARD PLAYGROUND DE TESTE RAG -->
+                        <div class="card">
+                            <div class="card-title">
+                                <i data-lucide="sparkles" style="width: 16px; height: 16px; color: var(--brand-purple);"></i> Playground de Teste RAG
+                            </div>
+                            <div class="card-desc">Simule perguntas de clientes para verificar quais blocos e tabelas a IA recuperará para responder.</div>
+                            
+                            <div class="rag-search-box">
+                                <input type="text" class="form-control" style="margin-bottom: 0;" placeholder="Digite uma dúvida (ex: quanto custa o procedimento X?)" id="rag-test-query">
+                                <button type="button" class="btn btn-primary" id="btn-test-rag-search" style="flex-shrink: 0;">
+                                    <i data-lucide="search" style="width: 14px; height: 14px;"></i> Buscar
+                                </button>
+                            </div>
+
+                            <div id="rag-search-results" style="max-height: 280px; overflow-y: auto;">
+                                <div style="text-align: center; color: var(--text-muted); font-size: 0.82rem; padding: 1.5rem 0;">
+                                    Digite uma pergunta acima para testar a recuperação de contexto RAG.
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="card">
-                        <h3>📄 Documentos Indexados</h3>
-                        <div id="rag-docs-list" style="margin-top: 1rem;"></div>
+                    <!-- COLUNA DIREITA: DOCUMENTOS INDEXADOS -->
+                    <div class="card" style="height: fit-content;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                            <div class="card-title" style="margin-bottom: 0;">
+                                <i data-lucide="folder-kanban" style="width: 16px; height: 16px; color: var(--brand-blue);"></i> Documentos Indexados
+                            </div>
+                            <button type="button" class="btn btn-secondary btn-sm" id="btn-refresh-rag-docs" title="Recarregar Lista">
+                                <i data-lucide="rotate-cw" style="width: 13px; height: 13px;"></i>
+                            </button>
+                        </div>
+                        <div class="card-desc">Arquivos e textos ativos disponíveis para busca em tempo real.</div>
+                        <div id="rag-docs-list" style="max-height: 560px; overflow-y: auto; padding-right: 2px;">
+                            <div style="text-align: center; color: var(--text-muted); padding: 2rem 0; font-size: 0.85rem;">
+                                Carregando base de conhecimento...
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
 
             <!-- TAB MARKETPLACE DE PROMPTS -->
             <section id="tab-marketplace" class="tab-pane">
-                <h2>📦 Marketplace de Templates de Prompts por Nicho</h2>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 1.5rem;" id="templates-grid"></div>
+                <div class="page-header">
+                    <div>
+                        <h1>Marketplace de Prompts</h1>
+                        <p>Modelos de personalidades e regras pré-construídas para diferentes segmentos de mercado.</p>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;" id="templates-grid"></div>
             </section>
 
             <!-- TAB CENTRAL DE TREINAMENTO -->
             <section id="tab-training" class="tab-pane">
-                <h2>🧠 Central de Treinamento da IA (FAQs & Regras)</h2>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1rem;">
+                <div class="page-header">
+                    <div>
+                        <h1>Central de Treinamento</h1>
+                        <p>Cadastre respostas padrão para dúvidas frequentes e diretrizes inegociáveis de atendimento.</p>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
                     <div class="card">
-                        <h3>❓ Perguntas Frequentes (FAQs)</h3>
-                        <form id="form-add-faq" style="margin-top: 1rem;">
-                            <input type="text" class="form-control" placeholder="Pergunta..." id="faq-question-input" required>
-                            <textarea class="form-control" placeholder="Resposta Oficial..." id="faq-answer-input" required></textarea>
-                            <button type="submit" class="btn btn-primary">Adicionar FAQ</button>
+                        <div class="card-title">
+                            <i data-lucide="help-circle" style="width: 16px; height: 16px; color: var(--brand-blue);"></i> Perguntas Frequentes (FAQs)
+                        </div>
+                        <div class="card-desc">A IA utilizará estas respostas como referência oficial.</div>
+                        <form id="form-add-faq">
+                            <input type="text" class="form-control" placeholder="Pergunta (ex: Qual o horário de atendimento?)" id="faq-question-input" required>
+                            <textarea class="form-control" style="height: 80px;" placeholder="Resposta Oficial..." id="faq-answer-input" required></textarea>
+                            <button type="submit" class="btn btn-primary" style="width: 100%;">
+                                <i data-lucide="plus" style="width: 14px; height: 14px;"></i> Adicionar FAQ
+                            </button>
                         </form>
-                        <div id="faqs-list" style="margin-top: 1.5rem;"></div>
+                        <div id="faqs-list" style="margin-top: 1.25rem;"></div>
                     </div>
 
                     <div class="card">
-                        <h3>⚠️ Regras Rígidas de Negócio</h3>
-                        <form id="form-add-rule" style="margin-top: 1rem;">
-                            <input type="text" class="form-control" placeholder="Regra de Negócio..." id="rule-input" required>
-                            <button type="submit" class="btn btn-primary">Adicionar Regra</button>
+                        <div class="card-title">
+                            <i data-lucide="alert-octagon" style="width: 16px; height: 16px; color: var(--brand-rose);"></i> Regras Rígidas de Negócio
+                        </div>
+                        <div class="card-desc">Diretrizes obrigatórias que a IA nunca deve violar.</div>
+                        <form id="form-add-rule">
+                            <input type="text" class="form-control" placeholder="Regra (ex: Nunca prometa descontos acima de 10%)" id="rule-input" required>
+                            <button type="submit" class="btn btn-primary" style="width: 100%;">
+                                <i data-lucide="plus" style="width: 14px; height: 14px;"></i> Adicionar Regra
+                            </button>
                         </form>
-                        <div id="rules-list" style="margin-top: 1.5rem;"></div>
+                        <div id="rules-list" style="margin-top: 1.25rem;"></div>
                     </div>
                 </div>
             </section>
 
             <!-- TAB PLAYGROUND -->
             <section id="tab-playground" class="tab-pane">
-                <h2>🧪 Playground de Testes da IA</h2>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1rem;">
+                <div class="page-header">
+                    <div>
+                        <h1>Playground LLM</h1>
+                        <p>Ambiente seguro para testar e validar o comportamento do prompt antes de colocar em produção.</p>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
                     <div class="card">
-                        <h3>Configurar Prompt de Teste</h3>
-                        <textarea class="form-control" style="height: 180px; margin-top: 1rem;" id="pg-prompt-input"></textarea>
-                        <textarea class="form-control" placeholder="Pergunta de teste..." id="pg-message-input"></textarea>
-                        <button class="btn btn-primary" id="btn-run-playground">Testar Resposta</button>
+                        <div class="card-title">
+                            <i data-lucide="sliders" style="width: 16px; height: 16px; color: var(--brand-blue);"></i> Configurar Prompt de Teste
+                        </div>
+                        <div class="card-desc">Simule perguntas de clientes para testar o tom de voz da IA.</div>
+                        <label class="form-label">System Prompt</label>
+                        <textarea class="form-control" style="height: 160px;" id="pg-prompt-input"></textarea>
+                        <label class="form-label">Mensagem do Cliente</label>
+                        <textarea class="form-control" style="height: 80px;" placeholder="ex: Quanto custa a consulta?" id="pg-message-input"></textarea>
+                        <button class="btn btn-primary" style="width: 100%;" id="btn-run-playground">
+                            <i data-lucide="play" style="width: 14px; height: 14px;"></i> Executar Teste de Resposta
+                        </button>
                     </div>
                     <div class="card">
-                        <h3>Telemetria da Resposta</h3>
-                        <div id="pg-results-container" style="margin-top: 1rem;">Aguardando teste...</div>
+                        <div class="card-title">
+                            <i data-lucide="activity" style="width: 16px; height: 16px; color: var(--brand-purple);"></i> Telemetria da Resposta
+                        </div>
+                        <div class="card-desc">Resultado e métricas detalhadas de geração.</div>
+                        <div id="pg-results-container" style="color: var(--text-muted); font-size: 0.86rem; padding: 1rem 0;">Aguardando execução do teste...</div>
                     </div>
                 </div>
             </section>
 
-            <!-- TAB PROMPTS & AGENTES -->
-            <section id="tab-prompts" class="tab-pane">
-                <h2>🤖 Prompts, Agentes & Versionamento</h2>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1rem;">
-                    <div class="card">
-                        <h3>➕ Criar Agente Customizado</h3>
-                        <form id="form-add-personality" style="margin-top: 1rem;">
-                            <input type="text" class="form-control" placeholder="Nome do Agente" id="p-name-input" required>
-                            <input type="text" class="form-control" placeholder="Descrição..." id="p-desc-input" required>
-                            <textarea class="form-control" style="height: 100px;" placeholder="Prompt..." id="p-prompt-input" required></textarea>
-                            <button type="submit" class="btn btn-primary">Criar Agente</button>
-                        </form>
-                        <div id="personalities-list" style="margin-top: 1.5rem;"></div>
-                    </div>
-                    <div class="card">
-                        <h3>Histórico de Versões do Prompt (v1, v2...)</h3>
-                        <div id="prompt-versions-list" style="margin-top: 1rem;"></div>
-                    </div>
-                </div>
-            </section>
+
 
             <!-- TAB CONTATOS -->
             <section id="tab-contacts" class="tab-pane">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <h2>👤 Agenda de Contatos & Blacklist</h2>
-                    <button class="btn btn-primary" id="btn-sync-contacts">🔄 Sincronizar Agenda do WhatsApp</button>
-                </div>
-                <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid var(--accent-blue); padding: 0.85rem 1rem; border-radius: 8px; margin-top: 1rem; font-size: 0.85rem; color: #93c5fd;">
-                    💡 <strong>Dica de Associação de Nome</strong>: Se um contato estiver aparecendo com o número ou <code>201240726257888@lid</code>, basta clicar no botão <strong>✏️ Editar</strong> da linha e digitar o Nome Real da pessoa. O sistema associará instantaneamente o nome ao JID e tratará a pessoa pelo nome correto em todas as conversas!
-                </div>
-
-                <!-- CARD DEDICADO DE BLACKLIST -->
-                <div class="card" style="margin-top: 1rem; border-left: 4px solid var(--accent-red);">
-                    <h3 style="color:#f87171;">🚫 Blacklist de Contatos Bloqueados</h3>
-                    <div id="blocked-table-container" style="margin-top: 1rem;"></div>
+                <div class="page-header">
+                    <div>
+                        <h1>Agenda de Contatos & Blacklist</h1>
+                        <p>Gerencie contatos mapeados, associações de LID e lista de bloqueios.</p>
+                    </div>
+                    <button class="btn btn-primary" id="btn-sync-contacts">
+                        <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i> Sincronizar Agenda do WhatsApp
+                    </button>
                 </div>
 
-                <div class="card" style="margin-top: 1rem;">
-                    <h3>➕ Cadastrar / Associar Contato & LID</h3>
-                    <form id="form-save-contact" style="display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap;">
-                        <input type="text" class="form-control" style="flex:1; min-width: 180px;" placeholder="JID / Número (ex: 5511998922730@c.us)" id="c-jid-input" required>
-                        <input type="text" class="form-control" style="flex:1; min-width: 180px;" placeholder="LID JID Opcional (ex: 270260917801120@lid)" id="c-lid-input">
-                        <input type="text" class="form-control" style="flex:1; min-width: 160px;" placeholder="Nome da Pessoa (ex: Lucas Silva)" id="c-name-input" required>
-                        <input type="text" class="form-control" style="flex:1; min-width: 140px;" placeholder="Relação (ex: Cliente)" id="c-rel-input">
-                        <input type="text" class="form-control" style="flex:1; min-width: 140px;" placeholder="Tags (ex: VIP)" id="c-tags-input">
-                        <button type="submit" class="btn btn-primary">Salvar Associação</button>
+                <div class="info-banner">
+                    <i data-lucide="info" style="width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px;"></i>
+                    <div>
+                        <strong>Dica de Associação de Nome:</strong> Se um contato estiver aparecendo com o número ou identificador LID (ex: <code>201240726257888@lid</code>), basta clicar em <strong>Editar</strong> e informar o nome real. O sistema associará instantaneamente o nome em todas as conversas!
+                    </div>
+                </div>
+
+                <!-- CARD BLACKLIST -->
+                <div class="card" style="border-left: 4px solid var(--brand-rose);">
+                    <div class="card-title" style="color: var(--brand-rose-text);">
+                        <i data-lucide="shield-ban" style="width: 16px; height: 16px; color: var(--brand-rose);"></i> Blacklist de Contatos Bloqueados
+                    </div>
+                    <div class="card-desc">Contatos que não recebem respostas automáticas da inteligência artificial.</div>
+                    <div class="table-container" id="blocked-table-container"></div>
+                </div>
+
+                <!-- FORM CADASTRAR / ASSOCIAR -->
+                <div class="card">
+                    <div class="card-title">
+                        <i data-lucide="user-plus" style="width: 16px; height: 16px; color: var(--brand-blue);"></i> Cadastrar / Associar Contato & LID
+                    </div>
+                    <div class="card-desc">Vincule números de telefone e IDs de privacidade ao nome do cliente.</div>
+                    <form id="form-save-contact" style="display: flex; gap: 0.65rem; flex-wrap: wrap;">
+                        <input type="text" class="form-control" style="flex: 1; min-width: 180px; margin-bottom: 0;" placeholder="JID / Número (ex: 5511999998888@c.us)" id="c-jid-input" required>
+                        <input type="text" class="form-control" style="flex: 1; min-width: 180px; margin-bottom: 0;" placeholder="LID JID Opcional (ex: 123456789012345@lid)" id="c-lid-input">
+                        <input type="text" class="form-control" style="flex: 1; min-width: 150px; margin-bottom: 0;" placeholder="Nome da Pessoa (ex: Lucas Silva)" id="c-name-input" required>
+                        <input type="text" class="form-control" style="flex: 1; min-width: 130px; margin-bottom: 0;" placeholder="Relação (ex: Cliente)" id="c-rel-input">
+                        <input type="text" class="form-control" style="flex: 1; min-width: 120px; margin-bottom: 0;" placeholder="Tags (ex: VIP)" id="c-tags-input">
+                        <button type="submit" class="btn btn-primary" style="white-space: nowrap;">
+                            <i data-lucide="save" style="width: 14px; height: 14px;"></i> Salvar
+                        </button>
                     </form>
                 </div>
-                <div class="card" style="margin-top: 1rem;">
-                    <h3>📇 Agenda de Contatos Mapeados</h3>
-                    <div id="contacts-table-container" style="margin-top: 1rem;"></div>
+
+                <!-- TABELA DE CONTATOS MAPEADOS -->
+                <div class="card">
+                    <div class="card-title">
+                        <i data-lucide="contact" style="width: 16px; height: 16px; color: var(--brand-blue);"></i> Agenda de Contatos Mapeados
+                    </div>
+                    <div class="card-desc">Lista de todos os contatos identificados e status de interação.</div>
+                    <div class="table-container" id="contacts-table-container"></div>
                 </div>
             </section>
 
             <!-- TAB MEMÓRIAS & PERFIL -->
             <section id="tab-memories" class="tab-pane">
-                <h2>🧠 Memórias & Perfil do Alex</h2>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1rem;">
+                <div class="page-header">
+                    <div>
+                        <h1>Memórias & Perfil do Administrador</h1>
+                        <p>Configurações de identidade e informações de longo prazo que a IA guarda sobre você e sua empresa.</p>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
                     <div class="card">
-                        <h3>➕ Adicionar Memória</h3>
-                        <form id="form-add-memory" style="margin-top: 1rem;">
-                            <input type="text" class="form-control" placeholder="Categoria" id="m-category-input" required>
-                            <textarea class="form-control" placeholder="Fato..." id="m-fact-input" required></textarea>
-                            <button type="submit" class="btn btn-primary">Gravar Memória</button>
+                        <div class="card-title">
+                            <i data-lucide="sparkles" style="width: 16px; height: 16px; color: var(--brand-purple);"></i> Adicionar Memória de Longo Prazo
+                        </div>
+                        <div class="card-desc">Fatos importantes que o bot deve lembrar nas conversas.</div>
+                        <form id="form-add-memory">
+                            <input type="text" class="form-control" placeholder="Categoria (ex: Preferência, Regra Geral)" id="m-category-input" required>
+                            <textarea class="form-control" placeholder="Fato (ex: Aceitamos PIX e Cartão de Crédito em até 12x)..." id="m-fact-input" required></textarea>
+                            <button type="submit" class="btn btn-primary" style="width: 100%;">
+                                <i data-lucide="save" style="width: 14px; height: 14px;"></i> Gravar Memória
+                            </button>
                         </form>
-                        <div id="memories-list" style="margin-top: 1.5rem;"></div>
+                        <div id="memories-list" style="margin-top: 1.25rem;"></div>
                     </div>
 
                     <div class="card">
-                        <h3>📋 Perfil do Alex</h3>
-                        <form id="form-save-profile" style="display: flex; gap: 0.75rem; margin-top: 1rem;">
-                            <input type="text" class="form-control" placeholder="Campo" id="prof-key-input" required>
-                            <input type="text" class="form-control" placeholder="Valor" id="prof-val-input" required>
-                            <button type="submit" class="btn btn-primary">Salvar</button>
+                        <div class="card-title">
+                            <i data-lucide="user" style="width: 16px; height: 16px; color: var(--brand-blue);"></i> Perfil e Metadados do Proprietário
+                        </div>
+                        <div class="card-desc">Campos chave-valor que definem o perfil institucional.</div>
+                        <form id="form-save-profile" style="display: flex; gap: 0.65rem;">
+                            <input type="text" class="form-control" style="margin-bottom: 0;" placeholder="Campo (ex: Cargo)" id="prof-key-input" required>
+                            <input type="text" class="form-control" style="margin-bottom: 0;" placeholder="Valor (ex: Diretor Comercial)" id="prof-val-input" required>
+                            <button type="submit" class="btn btn-primary">
+                                <i data-lucide="plus" style="width: 14px; height: 14px;"></i> Salvar
+                            </button>
                         </form>
-                        <div id="profile-table-container" style="margin-top: 1.5rem;"></div>
+                        <div id="profile-table-container" style="margin-top: 1.25rem;"></div>
                     </div>
                 </div>
             </section>
 
             <!-- TAB AUTOMAÇÕES -->
             <section id="tab-automations" class="tab-pane">
-                <h2>📅 Automações & Agendamentos</h2>
-                <div class="card" style="margin-top: 1rem;">
-                    <h3>➕ Novo Agendamento</h3>
-                    <form id="form-add-automation" style="display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap;">
-                        <input type="text" class="form-control" style="flex:1; min-width: 200px;" placeholder="JID do Contato" id="auto-jid-input" required>
-                        <input type="text" class="form-control" style="flex:1; min-width: 140px;" placeholder="Tipo" id="auto-type-input" required>
-                        <input type="text" class="form-control" style="flex:1; min-width: 120px;" placeholder="Horário (HH:MM)" id="auto-time-input" required>
-                        <input type="text" class="form-control" style="flex:2; min-width: 240px;" placeholder="Template..." id="auto-tpl-input" required>
-                        <button type="submit" class="btn btn-primary">Criar Agendamento</button>
+                <div class="page-header">
+                    <div>
+                        <h1>Automações & Agendamentos</h1>
+                        <p>Disparos programados e rotinas recorrentes de mensagens para clientes.</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">
+                        <i data-lucide="calendar-plus" style="width: 16px; height: 16px; color: var(--brand-blue);"></i> Novo Agendamento
+                    </div>
+                    <div class="card-desc">Configure horário e mensagem para disparo automático.</div>
+                    <form id="form-add-automation" style="display: flex; gap: 0.65rem; flex-wrap: wrap;">
+                        <input type="text" class="form-control" style="flex: 1; min-width: 180px; margin-bottom: 0;" placeholder="JID do Contato" id="auto-jid-input" required>
+                        <input type="text" class="form-control" style="flex: 1; min-width: 130px; margin-bottom: 0;" placeholder="Tipo (ex: lembrete)" id="auto-type-input" required>
+                        <input type="text" class="form-control" style="flex: 1; min-width: 110px; margin-bottom: 0;" placeholder="Horário (HH:MM)" id="auto-time-input" required>
+                        <input type="text" class="form-control" style="flex: 2; min-width: 220px; margin-bottom: 0;" placeholder="Template da Mensagem..." id="auto-tpl-input" required>
+                        <button type="submit" class="btn btn-primary" style="white-space: nowrap;">
+                            <i data-lucide="plus" style="width: 14px; height: 14px;"></i> Criar Agendamento
+                        </button>
                     </form>
                 </div>
-                <div class="card" style="margin-top: 1rem;">
-                    <div id="automations-table-container"></div>
+                <div class="card">
+                    <div class="card-title">
+                        <i data-lucide="list" style="width: 16px; height: 16px; color: var(--brand-blue);"></i> Agendamentos Ativos
+                    </div>
+                    <div class="card-desc">Rotinas ativas no agendador em segundo plano.</div>
+                    <div class="table-container" id="automations-table-container"></div>
                 </div>
             </section>
 
             <!-- TAB AUDITORIA -->
             <section id="tab-audit" class="tab-pane">
-                <h2>📜 Trilha de Auditoria (Git-style)</h2>
-                <div class="card" style="margin-top: 1rem;">
-                    <div id="audit-table-container"></div>
+                <div class="page-header">
+                    <div>
+                        <h1>Trilha de Auditoria</h1>
+                        <p>Registro histórico imutável das ações operacionais realizadas na plataforma.</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">
+                        <i data-lucide="shield-check" style="width: 16px; height: 16px; color: var(--brand-blue);"></i> Logs de Auditoria
+                    </div>
+                    <div class="card-desc">Histórico detalhado de alterações, exclusões e acessos.</div>
+                    <div class="table-container" id="audit-table-container"></div>
                 </div>
             </section>
 
             <!-- TAB EVENTOS AO VIVO -->
             <section id="tab-logs" class="tab-pane">
-                <h2>⚡ Feed de Eventos SSE ao Vivo</h2>
-                <div class="card" style="margin-top: 1rem;">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Hora</th>
-                                <th>Tipo</th>
-                                <th>Evento</th>
-                                <th>Detalhes</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="logs-table-body"></tbody>
-                    </table>
+                <div class="page-header">
+                    <div>
+                        <h1>Feed de Eventos ao Vivo</h1>
+                        <p>Transmissão em tempo real (SSE) das operações e fluxos de mensagens.</p>
+                    </div>
                 </div>
+                <div class="card">
+                    <div class="card-title">
+                        <i data-lucide="zap" style="width: 16px; height: 16px; color: var(--brand-amber);"></i> Stream de Eventos em Tempo Real
+                    </div>
+                    <div class="card-desc">Conexão direta com a fila de eventos do servidor.</div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Hora</th>
+                                    <th>Tipo</th>
+                                    <th>Evento</th>
+                                    <th>Detalhes</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logs-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB CONFIGURAÇÕES GERAIS -->
+            <section id="tab-settings" class="tab-pane">
+                <div class="page-header">
+                    <div>
+                        <h1>Configurações Gerais</h1>
+                        <p>Gerencie o perfil da empresa, horário de atendimento, mensagens de ausência e parâmetros dos modelos de IA.</p>
+                    </div>
+                    <div style="display: flex; gap: 0.75rem; align-items: center;">
+                        <button type="button" class="btn btn-primary" id="btn-save-settings-top">
+                            <i data-lucide="save" style="width: 15px; height: 15px;"></i> Salvar Configurações
+                        </button>
+                    </div>
+                </div>
+
+                <form id="form-settings">
+                    <div class="settings-grid">
+                        <!-- CARD 1: PERFIL DA EMPRESA -->
+                        <div class="settings-card">
+                            <div class="settings-card-header">
+                                <div class="settings-card-title">
+                                    <i data-lucide="building-2" style="width: 18px; height: 18px; color: var(--brand-blue);"></i>
+                                    Perfil da Empresa
+                                </div>
+                                <span class="badge-tag badge-blue">Contexto IA</span>
+                            </div>
+                            <div class="settings-card-subtitle">
+                                As informações da empresa fornecem a identidade base para que a IA atenda como representante oficial do seu negócio.
+                            </div>
+
+                            <label class="form-label" for="cfg-company-name">Nome da Empresa</label>
+                            <input type="text" class="form-control" id="cfg-company-name" placeholder="Ex: Clínica Castro" required>
+
+                            <label class="form-label" for="cfg-company-segment">Segmento / Ramo de Atuação</label>
+                            <input type="text" class="form-control" id="cfg-company-segment" placeholder="Ex: Odontologia Estética, Advocacia Trabalhista" required>
+                        </div>
+
+                        <!-- CARD 2: HORÁRIO COMERCIAL -->
+                        <div class="settings-card" id="card-hours-settings">
+                            <div class="settings-card-header">
+                                <div class="settings-card-title">
+                                    <i data-lucide="clock" style="width: 18px; height: 18px; color: var(--brand-amber);"></i>
+                                    Horário de Atendimento
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                                    <span id="cfg-hours-state-badge" class="badge-tag badge-slate">Desativado</span>
+                                    <label class="toggle-switch" title="Ativar ou desativar controle de horário comercial">
+                                        <input type="checkbox" id="cfg-hours-enabled">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="settings-card-subtitle">
+                                Quando ativado, limita o expediente da empresa. Fora do expediente, o atendimento é pausado ou responde mensagem de ausência. Quando desligado, a IA atende 24h por dia, 7 dias por semana.
+                            </div>
+
+                            <div id="cfg-hours-notice-off" class="settings-info-alert" style="display: none; border-color: #3b82f633; background: rgba(59, 130, 246, 0.05); color: var(--brand-blue);">
+                                <i data-lucide="zap" style="width: 15px; height: 15px; flex-shrink: 0;"></i>
+                                <span><strong>Modo 24/7 Ativo:</strong> O controle de horário está desligado. O assistente de IA responderá a qualquer hora do dia ou da noite, todos os dias.</span>
+                            </div>
+
+                            <div id="cfg-hours-body">
+                                <div style="display: flex; gap: 0.75rem; margin-bottom: 0.85rem;">
+                                    <div style="flex: 1;">
+                                        <label class="form-label" for="cfg-hours-start">Horário de Início</label>
+                                        <input type="text" class="form-control" id="cfg-hours-start" placeholder="08:00" style="margin-bottom: 0;">
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <label class="form-label" for="cfg-hours-end">Horário de Fim</label>
+                                        <input type="text" class="form-control" id="cfg-hours-end" placeholder="18:00" style="margin-bottom: 0;">
+                                    </div>
+                                </div>
+
+                                <label class="form-label">Dias de Funcionamento</label>
+                                <div class="days-selector">
+                                    <label class="day-pill-item">
+                                        <input type="checkbox" class="day-pill-input" name="cfg-days" value="1" id="day-1">
+                                        <span class="day-pill-label">Seg</span>
+                                    </label>
+                                    <label class="day-pill-item">
+                                        <input type="checkbox" class="day-pill-input" name="cfg-days" value="2" id="day-2">
+                                        <span class="day-pill-label">Ter</span>
+                                    </label>
+                                    <label class="day-pill-item">
+                                        <input type="checkbox" class="day-pill-input" name="cfg-days" value="3" id="day-3">
+                                        <span class="day-pill-label">Qua</span>
+                                    </label>
+                                    <label class="day-pill-item">
+                                        <input type="checkbox" class="day-pill-input" name="cfg-days" value="4" id="day-4">
+                                        <span class="day-pill-label">Qui</span>
+                                    </label>
+                                    <label class="day-pill-item">
+                                        <input type="checkbox" class="day-pill-input" name="cfg-days" value="5" id="day-5">
+                                        <span class="day-pill-label">Sex</span>
+                                    </label>
+                                    <label class="day-pill-item">
+                                        <input type="checkbox" class="day-pill-input" name="cfg-days" value="6" id="day-6">
+                                        <span class="day-pill-label">Sáb</span>
+                                    </label>
+                                    <label class="day-pill-item">
+                                        <input type="checkbox" class="day-pill-input" name="cfg-days" value="0" id="day-0">
+                                        <span class="day-pill-label">Dom</span>
+                                    </label>
+                                </div>
+
+                                <div style="margin-top: 1rem; padding: 0.65rem 0.85rem; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Status Atual:</span>
+                                    <span id="cfg-live-status-pill" class="status-pill-indicator badge-emerald">
+                                        <i data-lucide="check-circle" style="width: 12px; height: 12px;"></i> Dentro do Expediente
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CARD 3: MENSAGEM DE AUSÊNCIA -->
+                        <div class="settings-card" id="card-absence-settings">
+                            <div class="settings-card-header">
+                                <div class="settings-card-title">
+                                    <i data-lucide="bell-off" style="width: 18px; height: 18px; color: var(--brand-rose);"></i>
+                                    Mensagem de Ausência
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                                    <span id="cfg-absence-state-badge" class="badge-tag badge-slate">Desativada</span>
+                                    <label class="toggle-switch" title="Ativar ou desativar o envio de mensagem de ausência">
+                                        <input type="checkbox" id="cfg-absence-enabled">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="settings-card-subtitle">
+                                Resposta automática enviada quando um contato mandar mensagem fora do horário comercial. Cada cliente recebe no máximo 1 vez a cada 4 horas para evitar repetição.
+                            </div>
+
+                            <div id="cfg-absence-notice-off" class="settings-info-alert" style="display: none; border-color: #64748b33; background: rgba(100, 116, 139, 0.05); color: var(--text-secondary);">
+                                <i data-lucide="bell-off" style="width: 15px; height: 15px; flex-shrink: 0;"></i>
+                                <span><strong>Mensagem Desativada:</strong> Nenhuma mensagem automática de ausência será enviada aos clientes.</span>
+                            </div>
+
+                            <div id="cfg-absence-body">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                                    <label class="form-label" for="cfg-absence-message" style="margin-bottom: 0;">Texto da Mensagem de Ausência</label>
+                                    <span class="badge-tag badge-amber" style="font-size: 0.7rem;">Anti-flood 4h</span>
+                                </div>
+                                <textarea class="form-control" id="cfg-absence-message" style="height: 110px; resize: vertical;" placeholder="Olá! No momento estamos fora do nosso horário de atendimento. Responderemos assim que retornarmos!"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- CARD 4: PARÂMETROS DA INTELIGÊNCIA ARTIFICIAL -->
+                        <div class="settings-card">
+                            <div class="settings-card-header">
+                                <div class="settings-card-title">
+                                    <i data-lucide="cpu" style="width: 18px; height: 18px; color: var(--brand-purple);"></i>
+                                    Parâmetros da Inteligência Artificial
+                                </div>
+                                <span class="badge-tag badge-purple">Multi-LLM</span>
+                            </div>
+                            <div class="settings-card-subtitle">
+                                Configure o provedor padrão, modelo, nível de criatividade e memória contextual utilizada nas respostas.
+                            </div>
+
+                            <div style="display: flex; gap: 0.75rem; margin-bottom: 0.85rem;">
+                                <div style="flex: 1;">
+                                    <label class="form-label" for="cfg-ai-provider">Provedor Ativo</label>
+                                    <select class="form-control" id="cfg-ai-provider" style="margin-bottom: 0;">
+                                        <option value="openai">OpenAI</option>
+                                        <option value="gemini">Google Gemini</option>
+                                        <option value="ollama">Ollama (Local)</option>
+                                        <option value="lmstudio">LM Studio (Local)</option>
+                                    </select>
+                                </div>
+                                <div style="flex: 1;">
+                                    <label class="form-label" for="cfg-ai-model">Modelo Ativo</label>
+                                    <input type="text" class="form-control" id="cfg-ai-model" placeholder="gpt-4o-mini" style="margin-bottom: 0;">
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 0.75rem; margin-bottom: 0.85rem;">
+                                <div style="flex: 1;">
+                                    <label class="form-label" for="cfg-ai-temp">Temperatura (<span id="cfg-temp-val">0.7</span>)</label>
+                                    <input type="range" class="form-control" id="cfg-ai-temp" min="0" max="1" step="0.05" value="0.7" style="padding: 0; margin-bottom: 0; height: 36px;">
+                                </div>
+                                <div style="flex: 1;">
+                                    <label class="form-label" for="cfg-ai-limit">Histórico (msgs)</label>
+                                    <input type="number" class="form-control" id="cfg-ai-limit" min="2" max="50" value="10" style="margin-bottom: 0;">
+                                </div>
+                            </div>
+
+                            <div style="margin-top: 0.25rem;">
+                                <label class="form-label" for="cfg-ai-debounce" style="display:flex; justify-content:space-between; align-items:center;">
+                                    <span>Agrupamento de Mensagens / Debounce</span>
+                                    <span style="font-size:0.73rem; color:var(--text-muted); font-weight:normal;">Evita respostas duplicadas</span>
+                                </label>
+                                <div style="display: flex; gap: 0.75rem; align-items: center;">
+                                    <input type="number" step="0.5" min="1" max="15" class="form-control" id="cfg-ai-debounce" value="4.0" style="margin-bottom: 0; width: 100px;">
+                                    <span style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.35;">
+                                        Tempo (em segundos) que a IA aguarda antes de responder, agrupando mensagens que o cliente manda em sequência rápida numa única resposta coesa.
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CARD 5: CONEXÃO & SESSÃO DO WHATSAPP -->
+                        <div class="settings-card" id="card-wa-session">
+                            <div class="settings-card-header">
+                                <div class="settings-card-title">
+                                    <i data-lucide="smartphone" style="width: 18px; height: 18px; color: var(--brand-emerald);"></i>
+                                    Sessão do WhatsApp Web
+                                </div>
+                                <span class="badge-tag badge-emerald" id="settings-wa-badge">🟢 Conectado</span>
+                            </div>
+                            <div class="settings-card-subtitle">
+                                A sessão roda em segundo plano no computador (Modo Headless) e fica salva na máquina. Você pode desconectar o WhatsApp a qualquer momento para vincular outro aparelho ou renovar a conexão.
+                            </div>
+
+                            <div style="background: var(--bg-surface-secondary); padding: 0.9rem; border-radius: 8px; border: 1px solid var(--border-subtle); margin-bottom: 1rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                    <span style="font-size: 0.82rem; font-weight: 600; color: var(--text-secondary);">Modo de Execução:</span>
+                                    <span class="badge-tag badge-blue" id="settings-wa-mode">Headless (Invisível)</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                    <span style="font-size: 0.82rem; font-weight: 600; color: var(--text-secondary);">Número Conectado:</span>
+                                    <span style="font-size: 0.82rem; font-family: 'JetBrains Mono', monospace;" id="settings-wa-number">-</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-size: 0.82rem; font-weight: 600; color: var(--text-secondary);">Status da Instância:</span>
+                                    <span style="font-size: 0.82rem; font-weight: 600; color: var(--brand-emerald-text);" id="settings-wa-status-text">Ativa e Pronta</span>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 0.65rem; align-items: center;">
+                                <button type="button" class="btn btn-secondary btn-sm" id="btn-settings-disconnect-wa" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.35);">
+                                    <i data-lucide="log-out" style="width: 14px; height: 14px;"></i> Desconectar Sessão
+                                </button>
+                                <button type="button" class="btn btn-primary btn-sm" id="btn-settings-qr-wa" style="display: none;">
+                                    <i data-lucide="qr-code" style="width: 14px; height: 14px;"></i> Conectar via QR Code
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- CARD 6: AGENTE & PERSONALIDADE DO ATENDIMENTO -->
+                        <div class="settings-card" style="grid-column: 1 / -1;">
+                            <div class="settings-card-header">
+                                <div class="settings-card-title">
+                                    <i data-lucide="bot" style="width: 18px; height: 18px; color: var(--brand-blue);"></i>
+                                    Agente & Personalidade do Atendimento
+                                </div>
+                                <button type="button" class="btn btn-secondary btn-sm" id="btn-open-create-agent" style="display: flex; align-items: center; gap: 0.35rem;">
+                                    <i data-lucide="plus" style="width: 14px; height: 14px;"></i> Criar Novo Agente
+                                </button>
+                            </div>
+                            <div class="settings-card-subtitle">
+                                Escolha qual perfil de atendente responderá aos clientes no WhatsApp. Você pode alternar entre os agentes cadastrados, personalizar as instruções ou criar novas personas para o seu negócio.
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1.6fr; gap: 1.5rem; align-items: start;">
+                                <div>
+                                    <label class="form-label" for="cfg-select-agent">Agente Selecionado</label>
+                                    <select class="form-control" id="cfg-select-agent"></select>
+
+                                    <label class="form-label" for="cfg-agent-desc">Papel / Descrição</label>
+                                    <input type="text" class="form-control" id="cfg-agent-desc" placeholder="Descrição do papel do agente...">
+
+                                    <div style="display: flex; gap: 0.5rem; margin-top: 0.25rem;">
+                                        <button type="button" class="btn btn-secondary btn-sm" id="btn-save-agent-details" style="flex: 1; display:flex; align-items:center; justify-content:center; gap:0.35rem;">
+                                            <i data-lucide="save" style="width: 13px; height: 13px;"></i> Salvar Alterações
+                                        </button>
+                                        <button type="button" class="btn btn-danger btn-sm" id="btn-delete-agent" title="Excluir este agente customizado" style="display:flex; align-items:center; justify-content:center;">
+                                            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                                        </button>
+                                    </div>
+                                    <div id="cfg-agent-feedback" style="font-size: 0.78rem; font-weight: 600; display: none; margin-top: 0.45rem;"></div>
+                                </div>
+
+                                <div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                                        <label class="form-label" for="cfg-agent-prompt" style="margin-bottom: 0;">Diretrizes e Prompt do Agente</label>
+                                        <span class="badge-tag badge-emerald" id="cfg-agent-active-badge">
+                                            <i data-lucide="check-circle" style="width: 11px; height: 11px;"></i> Ativo no WhatsApp
+                                        </span>
+                                    </div>
+                                    <textarea class="form-control" id="cfg-agent-prompt" style="height: 140px; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; line-height: 1.45; resize: vertical;" placeholder="Instruções e diretrizes de conduta que o atendente seguirá..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 1rem; align-items: center; margin-top: 1rem; padding: 1rem 0;">
+                        <span id="cfg-save-feedback" style="font-size: 0.85rem; font-weight: 600; display: none;"></span>
+                        <button type="submit" class="btn btn-primary" id="btn-save-settings" style="padding: 0.65rem 1.5rem;">
+                            <i data-lucide="save" style="width: 16px; height: 16px;"></i> Salvar Todas as Configurações
+                        </button>
+                    </div>
+                </form>
             </section>
 
         </main>
     </div>
 
-    <!-- MODAL BUSCA GLOBAL (CTRL + K) -->
+    <!-- MODAL BUSCA GLOBAL (CTRL + K) NO PADRÃO CASTRODRIVE -->
     <div class="modal-backdrop" id="search-modal">
         <div class="modal-box">
-            <h3>🔍 Busca Global Notion-style (Ctrl + K)</h3>
-            <input type="text" class="form-control" style="margin-top: 1rem;" placeholder="Digite o que deseja pesquisar..." id="global-search-input">
-            <div id="global-search-results" style="max-height: 300px; overflow-y: auto; margin-top: 1rem;"></div>
+            <div class="modal-header">
+                <h3>Busca Global</h3>
+                <span class="kbd-badge">ESC para fechar</span>
+            </div>
+            <div style="position: relative; margin-top: 0.5rem;">
+                <input type="text" class="form-control" style="padding-left: 2.25rem; font-size: 0.95rem; margin-bottom: 0;" placeholder="Pesquisar contatos, histórico, FAQs e memórias..." id="global-search-input">
+                <i data-lucide="search" style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-subtle);"></i>
+            </div>
+            <div id="global-search-results" style="max-height: 320px; overflow-y: auto; margin-top: 1rem;"></div>
         </div>
     </div>
 
-    <script src="/js/app.js?v=15"></script>
+    <!-- MODAL CRIAR NOVO AGENTE (NO PADRÃO CASTRODRIVE) -->
+    <div class="modal-backdrop" id="modal-create-agent">
+        <div class="modal-box" style="max-width: 550px;">
+            <div class="modal-header">
+                <h3>Criar Novo Agente de Atendimento</h3>
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-close-modal-agent" style="padding: 0.2rem 0.5rem;">✕</button>
+            </div>
+            <p style="color:var(--text-muted); margin-bottom: 1.25rem; font-size: 0.82rem;">Defina a identidade, tom de voz e regras de conduta para o novo atendente virtual.</p>
+            <form id="form-create-agent">
+                <label class="form-label" for="new-agent-name">Nome do Agente</label>
+                <input type="text" class="form-control" id="new-agent-name" placeholder="Ex: Consultor Imobiliário" required>
+
+                <label class="form-label" for="new-agent-desc">Descrição do Papel</label>
+                <input type="text" class="form-control" id="new-agent-desc" placeholder="Ex: Qualificação de compradores e apresentação de imóveis" required>
+
+                <label class="form-label" for="new-agent-prompt">Prompt / Diretrizes do Agente</label>
+                <textarea class="form-control" id="new-agent-prompt" style="height: 120px; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;" placeholder="Você é o Consultor Imobiliário Virtual da Imobiliária..." required></textarea>
+
+                <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem;">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-modal-agent">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="btn-submit-create-agent">
+                        <i data-lucide="check" style="width: 14px; height: 14px;"></i> Criar e Ativar Agente
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL PREVIEW DE BLOCOS RAG -->
+    <div class="modal-backdrop" id="modal-rag-preview">
+        <div class="modal-box" style="max-width: 720px; max-height: 85vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <i data-lucide="layers" style="width: 18px; height: 18px; color: var(--brand-blue);"></i>
+                    <h3 id="rag-preview-title" style="margin: 0; font-size: 1rem;">Visualização de Blocos RAG</h3>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-close-rag-preview" style="padding: 0.2rem 0.5rem;">✕</button>
+            </div>
+            <div id="rag-preview-meta" style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.85rem;"></div>
+            <div id="rag-preview-chunks" style="overflow-y: auto; flex: 1; padding-right: 4px; display: flex; flex-direction: column; gap: 0.65rem;"></div>
+        </div>
+    </div>
+
+    <!-- MODAL EDITAR PALAVRAS-GATILHO RAG -->
+    <div class="modal-backdrop" id="modal-rag-edit-keywords">
+        <div class="modal-box" style="max-width: 500px;">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <i data-lucide="tag" style="width: 18px; height: 18px; color: var(--brand-blue);"></i>
+                    <h3 id="rag-edit-doc-title" style="margin: 0; font-size: 1rem;">Editar Palavras-Gatilho</h3>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-close-rag-edit" style="padding: 0.2rem 0.5rem;">✕</button>
+            </div>
+            <p style="color:var(--text-muted); font-size:0.8rem; margin-bottom:1rem;">
+                Quando o cliente usar qualquer uma dessas palavras no WhatsApp, este documento terá prioridade máxima de resposta para a IA.
+            </p>
+            <form id="form-edit-rag-keywords">
+                <input type="hidden" id="rag-edit-doc-id">
+                <label class="form-label">Palavras e Termos Gatilho (separados por vírgula)</label>
+                <input type="text" class="form-control" id="rag-edit-keywords-input" placeholder="Ex: preço, valor, tabela, quanto custa, orçamento">
+                <div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-bottom:1.25rem;">
+                    <span class="rag-suggest-pill" onclick="appendRagKeyword('rag-edit-keywords-input', 'preço, valor, quanto custa, orçamento')">+ Preços</span>
+                    <span class="rag-suggest-pill" onclick="appendRagKeyword('rag-edit-keywords-input', 'garantia, troca, estorno, prazo')">+ Garantia</span>
+                    <span class="rag-suggest-pill" onclick="appendRagKeyword('rag-edit-keywords-input', 'agendamento, horário, consulta, vaga')">+ Agendamento</span>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-rag-edit">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="btn-save-rag-keywords">
+                        <i data-lucide="check" style="width:14px;height:14px;"></i> Salvar Gatilhos
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL QR CODE WHATSAPP -->
+    <div class="modal-backdrop" id="modal-whatsapp-qr">
+        <div class="modal-box" style="max-width: 440px; text-align: center;">
+            <div class="modal-header" style="text-align: left;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <i data-lucide="qr-code" style="width: 18px; height: 18px; color: var(--brand-emerald);"></i>
+                    <h3 style="margin: 0; font-size: 1.05rem;">Vincular WhatsApp Web</h3>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-close-wa-qr" style="padding: 0.2rem 0.5rem;">✕</button>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0.6rem 0 1rem; text-align: left; line-height: 1.4;">
+                Abra o WhatsApp no seu smartphone, acesse <strong>Aparelhos Conectados</strong> &gt; <strong>Conectar um aparelho</strong> e aponte a câmera para o QR Code abaixo:
+            </p>
+
+            <div style="display: flex; justify-content: center; align-items: center; min-height: 250px; background: #ffffff; border-radius: 12px; padding: 1rem; border: 2px dashed var(--border-subtle); margin-bottom: 1rem;" id="wa-qr-container">
+                <div id="wa-qr-loading" style="color: #64748b; font-size: 0.85rem; display: flex; flex-direction: column; align-items: center; gap: 0.6rem;">
+                    <i data-lucide="loader-2" class="spin" style="width: 32px; height: 32px; color: var(--brand-emerald);"></i>
+                    <span id="wa-qr-status-msg">Gerando novo QR Code no WhatsApp Web...</span>
+                </div>
+                <img id="wa-qr-img" src="" alt="QR Code WhatsApp" style="display: none; max-width: 230px; height: auto; border-radius: 8px;">
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.78rem; color: var(--text-muted);" id="wa-qr-countdown">Atualização automática ativa</span>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button type="button" class="btn btn-secondary btn-sm" id="btn-refresh-wa-qr">
+                        <i data-lucide="refresh-cw" style="width: 13px; height: 13px;"></i> Atualizar
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" id="btn-done-wa-qr">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/app.js?v=21"></script>
     <script>
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(registrations => {
                 for (let r of registrations) r.unregister();

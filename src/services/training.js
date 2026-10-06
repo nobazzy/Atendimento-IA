@@ -11,7 +11,7 @@ function getFaqs() {
     }
 }
 
-function addFaq(question, answer, category = 'Geral', user = 'Alex') {
+function addFaq(question, answer, category = 'Geral', user = 'Admin') {
     try {
         const sQ = sanitizeInput(question);
         const sA = sanitizeInput(answer);
@@ -30,7 +30,7 @@ function addFaq(question, answer, category = 'Geral', user = 'Alex') {
     }
 }
 
-function updateFaq(id, question, answer, category = 'Geral', user = 'Alex') {
+function updateFaq(id, question, answer, category = 'Geral', user = 'Admin') {
     try {
         const sQ = sanitizeInput(question);
         const sA = sanitizeInput(answer);
@@ -45,7 +45,7 @@ function updateFaq(id, question, answer, category = 'Geral', user = 'Alex') {
     }
 }
 
-function deleteFaq(id, user = 'Alex') {
+function deleteFaq(id, user = 'Admin') {
     try {
         db.prepare('DELETE FROM faqs WHERE id = ?').run(id);
         addAuditLog(user, 'Removeu FAQ', `ID: ${id}`, '🔴');
@@ -65,7 +65,7 @@ function getTrainingRules() {
     }
 }
 
-function addTrainingRule(ruleText, user = 'Alex') {
+function addTrainingRule(ruleText, user = 'Admin') {
     try {
         const sRule = sanitizeInput(ruleText);
         if (!sRule) return null;
@@ -82,7 +82,7 @@ function addTrainingRule(ruleText, user = 'Alex') {
     }
 }
 
-function updateTrainingRule(id, ruleText, user = 'Alex') {
+function updateTrainingRule(id, ruleText, user = 'Admin') {
     try {
         const sRule = sanitizeInput(ruleText);
         if (!sRule) return false;
@@ -95,7 +95,7 @@ function updateTrainingRule(id, ruleText, user = 'Alex') {
     }
 }
 
-function deleteTrainingRule(id, user = 'Alex') {
+function deleteTrainingRule(id, user = 'Admin') {
     try {
         db.prepare('DELETE FROM training_rules WHERE id = ?').run(id);
         addAuditLog(user, 'Removeu Regra de Treinamento', `ID: ${id}`, '🔴');
@@ -116,7 +116,7 @@ function getKnowledgeDocs() {
     }
 }
 
-function addKnowledgeDoc(title, type, content, source = '', user = 'Alex') {
+function addKnowledgeDoc(title, type, content, source = '', user = 'Admin') {
     try {
         const sTitle = sanitizeInput(title);
         const sType = sanitizeInput(type).toLowerCase() || 'txt';
@@ -136,7 +136,7 @@ function addKnowledgeDoc(title, type, content, source = '', user = 'Alex') {
     }
 }
 
-function deleteKnowledgeDoc(id, user = 'Alex') {
+function deleteKnowledgeDoc(id, user = 'Admin') {
     try {
         db.prepare('DELETE FROM knowledge_docs WHERE id = ?').run(id);
         addAuditLog(user, 'Removeu Documento RAG', `ID: ${id}`, '🔴');

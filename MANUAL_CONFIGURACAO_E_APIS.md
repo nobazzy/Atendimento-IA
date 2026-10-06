@@ -7,7 +7,7 @@ Este guia prático ensina passo a passo como configurar o seu arquivo `.env`, ad
 ## 🛠️ 1. Onde Fica o Arquivo de Configuração?
 
 O arquivo de configuração fica na raiz do projeto com o nome **`.env`**:
-- **Caminho:** `C:\Users\vasco\.gemini\antigravity\scratch\atendimento-ia\.env`
+- **Caminho:** `.env` (na raiz do projeto)
 
 > 💡 **Como editar:** Você pode abrir o arquivo `.env` usando qualquer editor de texto (Bloco de Notas, VS Code ou Antigravity).
 
@@ -109,5 +109,5 @@ Além do arquivo `.env`, você também pode alternar o provedor de IA e a temper
 
 ## 🚀 5. Como Iniciar o Sistema Após Editar o `.env`
 
-Após fazer alterações no `.env`, abra o atalho **`iniciar_minha_ia.bat`** (ou dê duplo clique em **`abrir_painel_web.bat`**).
+Após fazer alterações no `.env`, execute `npm start` ou dê dois cliques em **`iniciar_ia.bat`** (ou `iniciar_minha_ia.bat`).
 O sistema carregará automaticamente as novas chaves e estará 100% pronto!

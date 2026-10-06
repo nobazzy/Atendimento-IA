@@ -456,7 +456,7 @@ function getFormattedUserContext() {
             context += `- ${label}: ${value}\n`;
         }
 
-        context += '\n[CONHECIMENTO SOBRE O ALEX]\n';
+        context += '\n[CONHECIMENTO SOBRE O ADMINISTRADOR]\n';
         for (const [key, value] of Object.entries(profile)) {
             const label = key.charAt(0).toUpperCase() + key.slice(1);
             context += `- ${label}: ${value}\n`;

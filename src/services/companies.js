@@ -11,7 +11,7 @@ function getCompanies() {
     }
 }
 
-function completeOnboarding(data, user = 'Alex') {
+function completeOnboarding(data, user = 'Admin') {
     try {
         const companyName = sanitizeInput(data.companyName) || 'Minha Empresa';
         const segment = sanitizeInput(data.segment) || 'Geral';

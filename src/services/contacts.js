@@ -1,5 +1,6 @@
 const { db, sanitizeInput } = require('../database');
 const { addAuditLog } = require('./audit');
+const config = require('../config');
 
 function cleanNumber(jidStr) {
     if (!jidStr) return '';
@@ -51,7 +52,7 @@ function getAllContacts() {
                 if (!mappedLid && phoneDigits) {
                     mappedLid = db.prepare("SELECT lid FROM lid_mappings WHERE phone_number = ?").get(phoneDigits);
                 }
-                if (!mappedLid && r.name && isHumanName(r.name) && r.name !== '@nobazzy') {
+                if (!mappedLid && r.name && isHumanName(r.name) && r.name !== 'Administrador') {
                     mappedLid = db.prepare("SELECT lid FROM lid_mappings WHERE name = ?").get(r.name);
                 }
                 if (mappedLid && mappedLid.lid) {
@@ -126,7 +127,7 @@ function isContactBlocked(jidOrNumber) {
     }
 }
 
-function saveContact(jid, name, relationship = 'Contato', notes = '', customPrompt = '', tags = 'Geral', favorite = 0, user = 'Alex', explicitLid = '') {
+function saveContact(jid, name, relationship = 'Contato', notes = '', customPrompt = '', tags = 'Geral', favorite = 0, user = 'Admin', explicitLid = '') {
     try {
         const sJid = sanitizeInput(jid);
         const sName = sanitizeInput(name);
@@ -156,7 +157,7 @@ function saveContact(jid, name, relationship = 'Contato', notes = '', customProm
 
         const existing = db.prepare(`
             SELECT * FROM contacts 
-            WHERE jid = ? OR phone_jid = ? OR (lid_jid != '' AND lid_jid = ?) OR (phone_number != '' AND phone_number = ?)
+            WHERE jid = ? OR (phone_jid != '' AND phone_jid = ?) OR (lid_jid != '' AND lid_jid = ?) OR (phone_number != '' AND phone_number = ?)
         `).get(sJid, phoneJid, lidJid, cleanDigits);
 
         if (existing) {
@@ -191,7 +192,7 @@ function saveContact(jid, name, relationship = 'Contato', notes = '', customProm
     }
 }
 
-function deleteContact(jid, user = 'Alex') {
+function deleteContact(jid, user = 'Admin') {
     try {
         const sJid = sanitizeInput(jid);
         const target = getContact(sJid);
@@ -228,7 +229,7 @@ function getContact(jid) {
     }
 }
 
-function blockContact(jidOrNumber, name = '', user = 'Alex') {
+function blockContact(jidOrNumber, name = '', user = 'Admin') {
     try {
         const raw = sanitizeInput(jidOrNumber);
         if (!raw) return false;
@@ -240,7 +241,7 @@ function blockContact(jidOrNumber, name = '', user = 'Alex') {
         const lidJid = resolved.lidJid || (raw.includes('@lid') ? raw : '');
 
         const timestamp = new Date().toISOString();
-        const last8 = phoneNum.length >= 8 ? phoneNum.slice(-8) : phoneNum;
+        const last8 = phoneNum.length >= 8 ? phoneNum.slice(-8) : '';
 
         const insBl = db.prepare(`
             INSERT INTO blacklist (jid, name, phone_digits, created_at)
@@ -248,24 +249,58 @@ function blockContact(jidOrNumber, name = '', user = 'Alex') {
             ON CONFLICT(jid) DO UPDATE SET name = excluded.name, phone_digits = excluded.phone_digits
         `);
 
-        // Bloquear todas as chaves associadas (RAW, Phone JID e LID JID) na Blacklist
+        // Bloquear chaves associadas válidas na Blacklist
         insBl.run(raw, contactName, last8, timestamp);
         if (phoneJid && phoneJid !== raw) insBl.run(phoneJid, contactName, last8, timestamp);
         if (lidJid && lidJid !== raw) insBl.run(lidJid, contactName, last8, timestamp);
 
-        // Atualizar status 1:1 na tabela de contatos
-        db.prepare(`
-            UPDATE contacts SET 
-                auto_reply = 0, 
-                relationship = 'Bloqueado',
-                lid_jid = CASE WHEN ? != '' THEN ? ELSE lid_jid END,
-                phone_jid = CASE WHEN ? != '' THEN ? ELSE phone_jid END,
-                phone_number = CASE WHEN ? != '' THEN ? ELSE phone_number END,
-                updated_at = ?
-            WHERE jid = ? OR phone_jid = ? OR lid_jid = ? OR name = ?
-        `).run(lidJid, lidJid, phoneJid, phoneJid, phoneNum, phoneNum, timestamp, raw, phoneJid, lidJid, contactName);
+        // Atualizar status 1:1 na tabela de contatos APENAS para os identificadores VÁLIDOS do contato
+        const whereClauses = [];
+        const whereParams = [];
 
-        addAuditLog(user, 'Adicionou à Blacklist', `Contato: ${contactName} (Phone: ${phoneJid}, LID: ${lidJid})`, '🔴');
+        if (raw) {
+            whereClauses.push('jid = ?');
+            whereParams.push(raw);
+        }
+        if (phoneJid && phoneJid !== raw) {
+            whereClauses.push('(phone_jid != \'\' AND phone_jid = ?)');
+            whereParams.push(phoneJid);
+            whereClauses.push('jid = ?');
+            whereParams.push(phoneJid);
+        }
+        if (lidJid && lidJid !== raw) {
+            whereClauses.push('(lid_jid != \'\' AND lid_jid = ?)');
+            whereParams.push(lidJid);
+            whereClauses.push('jid = ?');
+            whereParams.push(lidJid);
+        }
+        if (phoneNum && phoneNum.length >= 8) {
+            whereClauses.push('(phone_number != \'\' AND phone_number = ?)');
+            whereParams.push(phoneNum);
+        }
+
+        if (whereClauses.length > 0) {
+            let updateSql = `
+                UPDATE contacts SET 
+                    auto_reply = 0, 
+                    relationship = 'Bloqueado',
+                    updated_at = ?
+            `;
+            const updateParams = [timestamp];
+
+            // Apenas atualiza o lid_jid se tivermos um LID novo e válido
+            if (lidJid) {
+                updateSql += `, lid_jid = CASE WHEN lid_jid = '' OR lid_jid IS NULL THEN ? ELSE lid_jid END`;
+                updateParams.push(lidJid);
+            }
+
+            updateSql += ` WHERE ${whereClauses.join(' OR ')}`;
+            updateParams.push(...whereParams);
+
+            db.prepare(updateSql).run(...updateParams);
+        }
+
+        addAuditLog(user, 'Adicionou à Blacklist', `Contato: ${contactName} (Phone: ${phoneJid || 'N/A'}, LID: ${lidJid || 'N/A'})`, '🔴');
         return true;
     } catch (e) {
         console.error('⚠️ Erro ao bloquear contato:', e.message);
@@ -273,7 +308,7 @@ function blockContact(jidOrNumber, name = '', user = 'Alex') {
     }
 }
 
-function unblockContact(jidOrNumber, user = 'Alex') {
+function unblockContact(jidOrNumber, user = 'Admin') {
     try {
         const raw = sanitizeInput(jidOrNumber);
         if (!raw) return false;
@@ -286,22 +321,60 @@ function unblockContact(jidOrNumber, user = 'Alex') {
 
         const timestamp = new Date().toISOString();
 
-        // Remover todas as chaves associadas da tabela blacklist
-        db.prepare('DELETE FROM blacklist WHERE jid = ? OR jid = ? OR jid = ? OR name = ? OR (phone_digits != \'\' AND phone_digits = ?)').run(raw, phoneJid || '', lidJid || '', contactName, phoneNum);
+        // 1. Remover da tabela blacklist usando apenas identificadores válidos
+        const blClauses = ['jid = ?'];
+        const blParams = [raw];
 
-        if (phoneNum.length >= 8) {
-            const pattern = `%${phoneNum.slice(-8)}%`;
-            db.prepare("DELETE FROM blacklist WHERE phone_digits LIKE ? OR jid LIKE ?").run(pattern, pattern);
+        if (phoneJid && phoneJid !== raw) {
+            blClauses.push('jid = ?');
+            blParams.push(phoneJid);
+        }
+        if (lidJid && lidJid !== raw) {
+            blClauses.push('jid = ?');
+            blParams.push(lidJid);
+        }
+        if (phoneNum && phoneNum.length >= 8) {
+            blClauses.push('(phone_digits != \'\' AND phone_digits = ?)');
+            blParams.push(phoneNum.slice(-8));
         }
 
-        // Atualizar status na tabela contacts
-        db.prepare(`
-            UPDATE contacts SET 
-                auto_reply = 1, 
-                relationship = 'Contato',
-                updated_at = ?
-            WHERE jid = ? OR phone_jid = ? OR lid_jid = ? OR name = ? OR (phone_number != '' AND phone_number = ?)
-        `).run(timestamp, raw, phoneJid || '', lidJid || '', contactName, phoneNum);
+        db.prepare(`DELETE FROM blacklist WHERE ${blClauses.join(' OR ')}`).run(...blParams);
+
+        // 2. Atualizar status na tabela contacts usando apenas identificadores válidos
+        const whereClauses = [];
+        const whereParams = [];
+
+        if (raw) {
+            whereClauses.push('jid = ?');
+            whereParams.push(raw);
+        }
+        if (phoneJid && phoneJid !== raw) {
+            whereClauses.push('(phone_jid != \'\' AND phone_jid = ?)');
+            whereParams.push(phoneJid);
+            whereClauses.push('jid = ?');
+            whereParams.push(phoneJid);
+        }
+        if (lidJid && lidJid !== raw) {
+            whereClauses.push('(lid_jid != \'\' AND lid_jid = ?)');
+            whereParams.push(lidJid);
+            whereClauses.push('jid = ?');
+            whereParams.push(lidJid);
+        }
+        if (phoneNum && phoneNum.length >= 8) {
+            whereClauses.push('(phone_number != \'\' AND phone_number = ?)');
+            whereParams.push(phoneNum);
+        }
+
+        if (whereClauses.length > 0) {
+            const updateSql = `
+                UPDATE contacts SET 
+                    auto_reply = 1, 
+                    relationship = 'Contato',
+                    updated_at = ?
+                WHERE ${whereClauses.join(' OR ')}
+            `;
+            db.prepare(updateSql).run(timestamp, ...whereParams);
+        }
 
         addAuditLog(user, 'Removeu da Blacklist', `Identificador: ${raw}`, '🟢');
         return true;
@@ -390,7 +463,7 @@ function cleanUnsavedSyncedContacts() {
     }
 }
 
-function toggleManualOverride(chatId, pause = true, user = 'Alex') {
+function toggleManualOverride(chatId, pause = true, user = 'Admin') {
     try {
         const sChatId = sanitizeInput(chatId);
         if (!sChatId) return false;
@@ -416,10 +489,10 @@ function isManualOverrideActive(chatId) {
         const sChatId = sanitizeInput(chatId);
         if (!sChatId) return false;
 
-        // O chat próprio do Alex (Você / @nobazzy) NUNCA é bloqueado por atendimento manual
+        // O chat próprio do Administrador (Você / Administrador) NUNCA é bloqueado por atendimento manual
         const cleanMyNum = config.MY_NUMBER ? config.MY_NUMBER.replace(/\D/g, '') : '';
         const cleanChat = sChatId.replace(/\D/g, '');
-        if (sChatId === '272653298487378@lid' || sChatId === '5511935855321@c.us' || (cleanMyNum && cleanChat === cleanMyNum)) {
+        if (cleanMyNum && (cleanChat === cleanMyNum || sChatId === `${cleanMyNum}@c.us` || sChatId === `${cleanMyNum}@lid`)) {
             return false;
         }
 
@@ -453,14 +526,14 @@ function saveLidMapping(lid, phoneJidOrNum = '', name = '') {
         const cleanMyNum = config.MY_NUMBER ? config.MY_NUMBER.replace(/\D/g, '') : '';
         const now = new Date().toISOString();
 
-        // Se o LID for do Alex (ou mapeamento do Alex), associar diretamente com o MY_NUMBER
-        if (sLid === `${cleanMyNum}@lid` || sLid === '272653298487378@lid' || sName === '@nobazzy') {
-            const alexPhone = cleanMyNum || '5511935855321';
-            const alexJid = `${alexPhone}@c.us`;
+        // Se o LID for do Administrador (configurado via MY_NUMBER), associar diretamente
+        if (cleanMyNum && (sLid === `${cleanMyNum}@lid` || sLid.includes(cleanMyNum) || (sInput && sInput.includes(cleanMyNum)))) {
+            const adminPhone = cleanMyNum;
+            const adminJid = `${adminPhone}@c.us`;
             db.prepare(`
                 INSERT INTO lid_mappings (lid, phone_number, phone_jid, name, updated_at) VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(lid) DO UPDATE SET phone_number = ?, phone_jid = ?, name = '@nobazzy', updated_at = ?
-            `).run(sLid, alexPhone, alexJid, '@nobazzy', now, alexPhone, alexJid, now);
+                ON CONFLICT(lid) DO UPDATE SET phone_number = ?, phone_jid = ?, name = 'Administrador', updated_at = ?
+            `).run(sLid, adminPhone, adminJid, 'Administrador', now, adminPhone, adminJid, now);
             return true;
         }
 
@@ -477,13 +550,15 @@ function saveLidMapping(lid, phoneJidOrNum = '', name = '') {
         // 2. Auto-vínculo 1:1 na tabela contacts por telefone real ou por nome
         let existing = null;
         if (realPhoneDigits) {
+            const last8 = realPhoneDigits.slice(-8);
             existing = db.prepare(`
                 SELECT * FROM contacts 
-                WHERE jid = ? OR phone_jid = ? OR (phone_number != '' AND phone_number = ?)
-            `).get(phoneJid, phoneJid, realPhoneDigits);
+                WHERE jid = ? OR phone_jid = ? 
+                   OR (phone_number != '' AND (phone_number = ? OR phone_number LIKE ?))
+            `).get(phoneJid, phoneJid, realPhoneDigits, `%${last8}%`);
         }
 
-        if (!existing && sName && isHumanName(sName) && sName !== '@nobazzy') {
+        if (!existing && sName && isHumanName(sName) && sName !== 'Administrador') {
             existing = db.prepare(`SELECT * FROM contacts WHERE name = ? AND (phone_number != '' OR phone_jid != '')`).get(sName);
         }
 
@@ -493,11 +568,12 @@ function saveLidMapping(lid, phoneJidOrNum = '', name = '') {
                     phone_number = CASE WHEN ? != '' THEN ? ELSE phone_number END,
                     phone_jid = CASE WHEN ? != '' THEN ? ELSE phone_jid END,
                     lid_jid = ?,
-                    name = CASE WHEN ? != '' AND ? != '@nobazzy' THEN ? ELSE name END,
+                    name = CASE WHEN ? != '' AND ? != 'Administrador' AND (contacts.name = '' OR contacts.name IS NULL) THEN ? ELSE name END,
                     updated_at = ?
                 WHERE jid = ?
             `).run(realPhoneDigits, realPhoneDigits, phoneJid, phoneJid, sLid, sName, sName, sName, now, existing.jid);
-        } else if (sName && isHumanName(sName) && sName !== '@nobazzy') {
+            console.log(`✅ [LID MAPPING] Vínculo salvo: Contato "${existing.name || sName}" (${existing.jid}) ➔ LID ${sLid}`);
+        } else if (sName && isHumanName(sName) && sName !== 'Administrador') {
             const primaryJid = phoneJid || sLid;
             db.prepare(`
                 INSERT INTO contacts (jid, phone_number, phone_jid, lid_jid, name, relationship, notes, custom_prompt, auto_reply, tags, favorite, updated_at)
@@ -507,6 +583,7 @@ function saveLidMapping(lid, phoneJidOrNum = '', name = '') {
 
         return true;
     } catch (e) {
+        console.error('⚠️ [SAVE LID MAPPING ERROR]:', e.message);
         return false;
     }
 }
@@ -520,7 +597,10 @@ function resolveContactDisplay(chatId) {
 
         let ct = db.prepare(`
             SELECT * FROM contacts 
-            WHERE jid = ? OR phone_jid = ? OR lid_jid = ? OR (phone_number != '' AND phone_number = ?)
+            WHERE jid = ? 
+               OR (phone_jid != '' AND phone_jid = ?) 
+               OR (lid_jid != '' AND lid_jid = ?) 
+               OR (phone_number != '' AND phone_number = ?)
         `).get(raw, raw, raw, digits);
 
         if (ct && ct.name) {
@@ -546,7 +626,7 @@ function resolveContactDisplay(chatId) {
                     if (cByJid && cByJid.name) rName = cByJid.name;
                 }
 
-                if (rName && isHumanName(rName) && rName !== '@nobazzy') {
+                if (rName && isHumanName(rName) && rName !== 'Administrador') {
                     return {
                         name: rName,
                         phoneNumber: pNum,
