@@ -27,7 +27,6 @@ const { backupDatabase, getBackupList } = require('../services/backups');
 const { testPromptPlayground, getLlmTelemetry } = require('../core/llm');
 const { getWhatsAppStatus, sendBotMessage, syncWhatsAppContacts, resolveSingleLid, disconnectWhatsApp, reconnectWhatsApp } = require('../core/whatsapp');
 const { getSystemHealth } = require('../core/scheduler');
-const { getCampaigns, getCampaignProspects, sendProspectMessage, startBatchProspecting, stopBatchProspecting, getBatchStatus } = require('../services/prospectbr');
 
 function createServer() {
     const app = express();
@@ -567,56 +566,6 @@ function createServer() {
         } catch (e) {
             res.status(500).json({ success: false, error: e.message });
         }
-    });
-
-    // ─── INTEGRAÇÃO PROSPECTBR (PROSPECÇÃO ATIVA & VENDAS KIWIFY) ───
-    app.get('/api/prospectbr/campaigns', async (req, res) => {
-        try {
-            const campaigns = await getCampaigns();
-            res.json({ success: true, campaigns });
-        } catch (e) {
-            res.status(500).json({ success: false, error: e.message });
-        }
-    });
-
-    app.get('/api/prospectbr/prospects', async (req, res) => {
-        try {
-            const campaignId = req.query.campaign_id ? Number(req.query.campaign_id) : 6;
-            const prospects = await getCampaignProspects(campaignId);
-            res.json({ success: true, prospects, total: prospects.length });
-        } catch (e) {
-            res.status(500).json({ success: false, error: e.message });
-        }
-    });
-
-    app.post('/api/prospectbr/send-single', async (req, res) => {
-        try {
-            const { prospectId, variant } = req.body;
-            if (!prospectId) return res.status(400).json({ success: false, error: 'prospectId é obrigatório' });
-            const result = await sendProspectMessage(prospectId, variant || 'SHORT');
-            res.json(result);
-        } catch (e) {
-            res.status(500).json({ success: false, error: e.message });
-        }
-    });
-
-    app.post('/api/prospectbr/batch/start', async (req, res) => {
-        try {
-            const { campaignId, variant, delaySeconds } = req.body;
-            const result = await startBatchProspecting(campaignId || 6, variant || 'SHORT', delaySeconds || 15);
-            res.json(result);
-        } catch (e) {
-            res.status(500).json({ success: false, error: e.message });
-        }
-    });
-
-    app.post('/api/prospectbr/batch/stop', (req, res) => {
-        const result = stopBatchProspecting();
-        res.json(result);
-    });
-
-    app.get('/api/prospectbr/batch/status', (req, res) => {
-        res.json({ success: true, status: getBatchStatus() });
     });
 
     // ─── AÇÕES DE SISTEMA ───
