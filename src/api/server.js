@@ -27,6 +27,7 @@ const { backupDatabase, getBackupList } = require('../services/backups');
 const { testPromptPlayground, getLlmTelemetry } = require('../core/llm');
 const { getWhatsAppStatus, sendBotMessage, syncWhatsAppContacts, resolveSingleLid, disconnectWhatsApp, reconnectWhatsApp } = require('../core/whatsapp');
 const { getSystemHealth } = require('../core/scheduler');
+const { getCampaigns, getCampaignProspects, sendProspectMessage, startBatchProspecting, stopBatchProspecting, getBatchStatus } = require('../services/prospectbr');
 
 function createServer() {
     const app = express();
@@ -57,7 +58,7 @@ function createServer() {
     });
 
     app.post('/api/onboarding/setup', (req, res) => {
-        const result = completeOnboarding(req.body, 'Admin');
+        const result = completeOnboarding(req.body, 'Alex');
         res.json(result);
     });
 
@@ -68,7 +69,7 @@ function createServer() {
     });
 
     app.post('/api/settings', (req, res) => {
-        const result = saveAllSettings(req.body, 'Admin');
+        const result = saveAllSettings(req.body, 'Alex');
         res.json(result);
     });
 
@@ -102,7 +103,7 @@ function createServer() {
 
     app.post('/api/templates/apply', (req, res) => {
         const { templateId } = req.body;
-        const ok = applyPromptTemplate(templateId, 'Admin');
+        const ok = applyPromptTemplate(templateId, 'Alex');
         res.json({ success: ok });
     });
 
@@ -120,7 +121,7 @@ function createServer() {
             const keywords = req.body.keywords || '';
             const results = [];
             for (const file of req.files) {
-                const indexed = await indexUploadedFile(file, 'Admin', 'default', keywords);
+                const indexed = await indexUploadedFile(file, 'Alex', 'default', keywords);
                 results.push(indexed);
             }
 
@@ -134,7 +135,7 @@ function createServer() {
     app.post(['/api/rag/text', '/api/training/docs'], (req, res) => {
         try {
             const { title, type, content, source, keywords } = req.body;
-            const doc = indexManualText(title, content, type, source, 'Admin', 'default', keywords || '');
+            const doc = indexManualText(title, content, type, source, 'Alex', 'default', keywords || '');
             res.json({ success: Boolean(doc), doc });
         } catch (err) {
             res.status(500).json({ success: false, error: err.message });
@@ -144,7 +145,7 @@ function createServer() {
     app.put('/api/rag/docs/:id/keywords', (req, res) => {
         try {
             const { keywords } = req.body;
-            const ok = updateDocKeywords(req.params.id, keywords, 'Admin');
+            const ok = updateDocKeywords(req.params.id, keywords, 'Alex');
             res.json({ success: ok, keywords });
         } catch (err) {
             res.status(500).json({ success: false, error: err.message });
@@ -163,7 +164,7 @@ function createServer() {
     });
 
     app.delete(['/api/rag/docs/:id', '/api/training/docs/:id'], (req, res) => {
-        const ok = deleteRagDoc(req.params.id, 'Admin');
+        const ok = deleteRagDoc(req.params.id, 'Alex');
         res.json({ success: ok });
     });
 
@@ -294,7 +295,7 @@ function createServer() {
         try {
             const chatId = req.params.chatId;
             db.prepare('DELETE FROM chat_history WHERE chat_id = ?').run(chatId);
-            addAuditLog('Admin', 'Apagou Histórico da Conversa', `Chat: ${chatId}`, '🔴');
+            addAuditLog('Alex', 'Apagou Histórico da Conversa', `Chat: ${chatId}`, '🔴');
             res.json({ success: true });
         } catch (e) {
             res.status(500).json({ success: false, error: e.message });
@@ -335,18 +336,18 @@ function createServer() {
 
     app.post('/api/prompts/versions', (req, res) => {
         const { prompt, notes } = req.body;
-        const created = createPromptVersion(prompt, 'Admin', notes);
+        const created = createPromptVersion(prompt, 'Alex', notes);
         res.json({ success: Boolean(created), version: created });
     });
 
     app.post('/api/prompts/versions/restore', (req, res) => {
         const { versionId } = req.body;
-        const restored = restorePromptVersion(versionId, 'Admin');
+        const restored = restorePromptVersion(versionId, 'Alex');
         res.json({ success: Boolean(restored), version: restored });
     });
 
     app.delete('/api/prompts/versions/:id', (req, res) => {
-        const ok = deletePromptVersion(req.params.id, 'Admin');
+        const ok = deletePromptVersion(req.params.id, 'Alex');
         res.json({ success: ok });
     });
 
@@ -356,24 +357,24 @@ function createServer() {
 
     app.post('/api/personalities', (req, res) => {
         const { name, description, prompt } = req.body;
-        const created = createPersonality(name, description, prompt, 'Admin');
+        const created = createPersonality(name, description, prompt, 'Alex');
         res.json({ success: Boolean(created), personality: created });
     });
 
     app.put('/api/personalities/:id', (req, res) => {
         const { name, description, prompt } = req.body;
-        const updated = updatePersonality(req.params.id, name, description, prompt, 'Admin');
+        const updated = updatePersonality(req.params.id, name, description, prompt, 'Alex');
         res.json({ success: Boolean(updated), personality: updated });
     });
 
     app.delete('/api/personalities/:id', (req, res) => {
-        const ok = deletePersonality(req.params.id, 'Admin');
+        const ok = deletePersonality(req.params.id, 'Alex');
         res.json({ success: ok });
     });
 
     app.post('/api/personalities/active', (req, res) => {
         const { id } = req.body;
-        const ok = setActivePersonality(id, 'Admin');
+        const ok = setActivePersonality(id, 'Alex');
         res.json({ success: ok });
     });
 
@@ -384,18 +385,18 @@ function createServer() {
 
     app.post('/api/training/faqs', (req, res) => {
         const { question, answer, category } = req.body;
-        const faq = addFaq(question, answer, category, 'Admin');
+        const faq = addFaq(question, answer, category, 'Alex');
         res.json({ success: Boolean(faq), faq });
     });
 
     app.put('/api/training/faqs/:id', (req, res) => {
         const { question, answer, category } = req.body;
-        const ok = updateFaq(req.params.id, question, answer, category, 'Admin');
+        const ok = updateFaq(req.params.id, question, answer, category, 'Alex');
         res.json({ success: ok });
     });
 
     app.delete('/api/training/faqs/:id', (req, res) => {
-        const ok = deleteFaq(req.params.id, 'Admin');
+        const ok = deleteFaq(req.params.id, 'Alex');
         res.json({ success: ok });
     });
 
@@ -405,18 +406,18 @@ function createServer() {
 
     app.post('/api/training/rules', (req, res) => {
         const { rule } = req.body;
-        const newRule = addTrainingRule(rule, 'Admin');
+        const newRule = addTrainingRule(rule, 'Alex');
         res.json({ success: Boolean(newRule), rule: newRule });
     });
 
     app.put('/api/training/rules/:id', (req, res) => {
         const { rule } = req.body;
-        const ok = updateTrainingRule(req.params.id, rule, 'Admin');
+        const ok = updateTrainingRule(req.params.id, rule, 'Alex');
         res.json({ success: ok });
     });
 
     app.delete('/api/training/rules/:id', (req, res) => {
-        const ok = deleteTrainingRule(req.params.id, 'Admin');
+        const ok = deleteTrainingRule(req.params.id, 'Alex');
         res.json({ success: ok });
     });
 
@@ -434,24 +435,24 @@ function createServer() {
 
     app.post('/api/contacts', (req, res) => {
         const { jid, name, relationship, notes, customPrompt, tags, favorite, lid_jid } = req.body;
-        const contact = saveContact(jid, name, relationship, notes, customPrompt, tags, favorite, 'Admin', lid_jid || '');
+        const contact = saveContact(jid, name, relationship, notes, customPrompt, tags, favorite, 'Alex', lid_jid || '');
         res.json({ success: Boolean(contact), contact });
     });
 
     app.delete('/api/contacts/:jid', (req, res) => {
-        const ok = deleteContact(req.params.jid, 'Admin');
+        const ok = deleteContact(req.params.jid, 'Alex');
         res.json({ success: ok });
     });
 
     app.post('/api/contacts/block', (req, res) => {
         const { jidOrNumber, name } = req.body;
-        const ok = blockContact(jidOrNumber, name, 'Admin');
+        const ok = blockContact(jidOrNumber, name, 'Alex');
         res.json({ success: ok });
     });
 
     app.post('/api/contacts/unblock', (req, res) => {
         const { jidOrNumber } = req.body;
-        const ok = unblockContact(jidOrNumber, 'Admin');
+        const ok = unblockContact(jidOrNumber, 'Alex');
         res.json({ success: ok });
     });
 
@@ -478,29 +479,29 @@ function createServer() {
 
     app.post('/api/memories', (req, res) => {
         const { category, fact } = req.body;
-        const memory = addMemory(category, fact, 'Admin');
+        const memory = addMemory(category, fact, 'Alex');
         res.json({ success: Boolean(memory), memory });
     });
 
     app.put('/api/memories/:id', (req, res) => {
         const { category, fact } = req.body;
-        const ok = updateMemory(req.params.id, category, fact, 'Admin');
+        const ok = updateMemory(req.params.id, category, fact, 'Alex');
         res.json({ success: ok });
     });
 
     app.delete('/api/memories/:id', (req, res) => {
-        const ok = deleteMemory(req.params.id, 'Admin');
+        const ok = deleteMemory(req.params.id, 'Alex');
         res.json({ success: ok });
     });
 
     app.post('/api/profile', (req, res) => {
         const { key, value } = req.body;
-        const ok = setProfileValue(key, value, 'Admin');
+        const ok = setProfileValue(key, value, 'Alex');
         res.json({ success: ok });
     });
 
     app.delete('/api/profile/:key', (req, res) => {
-        const ok = deleteProfileValue(req.params.key, 'Admin');
+        const ok = deleteProfileValue(req.params.key, 'Alex');
         res.json({ success: ok });
     });
 
@@ -511,18 +512,18 @@ function createServer() {
 
     app.post('/api/automations', (req, res) => {
         const { contact_jid, type, time, message_template } = req.body;
-        const auto = addAutomation(contact_jid, type, time, message_template, 'Admin');
+        const auto = addAutomation(contact_jid, type, time, message_template, 'Alex');
         res.json({ success: Boolean(auto), automation: auto });
     });
 
     app.put('/api/automations/:id', (req, res) => {
         const { active } = req.body;
-        const ok = toggleAutomation(req.params.id, Boolean(active), 'Admin');
+        const ok = toggleAutomation(req.params.id, Boolean(active), 'Alex');
         res.json({ success: ok });
     });
 
     app.delete('/api/automations/:id', (req, res) => {
-        const ok = deleteAutomation(req.params.id, 'Admin');
+        const ok = deleteAutomation(req.params.id, 'Alex');
         res.json({ success: ok });
     });
 
@@ -536,7 +537,7 @@ function createServer() {
     });
 
     app.post('/api/backups/create', (req, res) => {
-        const backupName = backupDatabase('Admin');
+        const backupName = backupDatabase('Alex');
         res.json({ success: Boolean(backupName), backupName });
     });
 
@@ -552,7 +553,7 @@ function createServer() {
 
     app.post('/api/whatsapp/disconnect', async (req, res) => {
         try {
-            const result = await disconnectWhatsApp('Admin');
+            const result = await disconnectWhatsApp('Alex');
             res.json(result);
         } catch (e) {
             res.status(500).json({ success: false, error: e.message });
@@ -561,18 +562,68 @@ function createServer() {
 
     app.post('/api/whatsapp/reconnect', async (req, res) => {
         try {
-            const result = await reconnectWhatsApp('Admin');
+            const result = await reconnectWhatsApp('Alex');
             res.json(result);
         } catch (e) {
             res.status(500).json({ success: false, error: e.message });
         }
     });
 
+    // ─── INTEGRAÇÃO PROSPECTBR (PROSPECÇÃO ATIVA & VENDAS KIWIFY) ───
+    app.get('/api/prospectbr/campaigns', async (req, res) => {
+        try {
+            const campaigns = await getCampaigns();
+            res.json({ success: true, campaigns });
+        } catch (e) {
+            res.status(500).json({ success: false, error: e.message });
+        }
+    });
+
+    app.get('/api/prospectbr/prospects', async (req, res) => {
+        try {
+            const campaignId = req.query.campaign_id ? Number(req.query.campaign_id) : 6;
+            const prospects = await getCampaignProspects(campaignId);
+            res.json({ success: true, prospects, total: prospects.length });
+        } catch (e) {
+            res.status(500).json({ success: false, error: e.message });
+        }
+    });
+
+    app.post('/api/prospectbr/send-single', async (req, res) => {
+        try {
+            const { prospectId, variant } = req.body;
+            if (!prospectId) return res.status(400).json({ success: false, error: 'prospectId é obrigatório' });
+            const result = await sendProspectMessage(prospectId, variant || 'SHORT');
+            res.json(result);
+        } catch (e) {
+            res.status(500).json({ success: false, error: e.message });
+        }
+    });
+
+    app.post('/api/prospectbr/batch/start', async (req, res) => {
+        try {
+            const { campaignId, variant, delaySeconds } = req.body;
+            const result = await startBatchProspecting(campaignId || 6, variant || 'SHORT', delaySeconds || 15);
+            res.json(result);
+        } catch (e) {
+            res.status(500).json({ success: false, error: e.message });
+        }
+    });
+
+    app.post('/api/prospectbr/batch/stop', (req, res) => {
+        const result = stopBatchProspecting();
+        res.json(result);
+    });
+
+    app.get('/api/prospectbr/batch/status', (req, res) => {
+        res.json({ success: true, status: getBatchStatus() });
+    });
+
     // ─── AÇÕES DE SISTEMA ───
     app.post('/api/system/action', (req, res) => {
         const { action } = req.body;
         if (action === 'kill') {
-            addAuditLog('Admin', 'Kill Switch Acionado pelo Painel Web', 'Servidor encerrado', '🔴');
+            addAuditLog('Alex', 'Kill Switch Acionado pelo Painel Web', 'Servidor encerrado', '🔴');
             res.json({ success: true, message: 'Servidor sendo desligado...' });
             setTimeout(() => process.exit(0), 1000);
         } else {

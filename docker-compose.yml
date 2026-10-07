@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  atendimento-ia:
+    build: .
+    container_name: atendimento_ia_app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+    volumes:
+      - ./data_auth:/.wwebjs_auth
+      - ./database.sqlite:/app/database.sqlite
+      - ./.env:/app/.env
