@@ -1041,13 +1041,13 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
             }
 
             // B) MENSAGENS OU COMANDOS DIGITADOS NO CHAT PRÓPRIO DO ADMINISTRADOR ("VOCÊ" / isSelf === true)
-            if (body.startsWith('!') || body.toLowerCase().startsWith('!admin') || body.toLowerCase().startsWith('!ia') || body.toLowerCase().startsWith('!admin')) {
-                if (lower === '!admin' || lower === '!ia' || lower === '!admin' || lower === '!ajuda' || lower === '!comandos' || lower === '!admin ajuda' || lower === '!ia ajuda' || lower === '!admin ajuda' || lower === '!admin comandos' || lower === '!ia comandos' || lower === '!admin comandos') {
+            if (body.startsWith('!') || body.toLowerCase().startsWith('!admin') || body.toLowerCase().startsWith('!ia') || body.toLowerCase().startsWith('!nobazzy')) {
+                if (lower === '!admin' || lower === '!ia' || lower === '!nobazzy' || lower === '!ajuda' || lower === '!comandos' || lower.includes('ajuda') || lower.includes('comandos')) {
                     await sendBotMessage(currentChatJid, getHelpMenuText());
                     return;
                 }
 
-                if (lower === '!admin perfil' || lower === '!ia perfil' || lower === '!admin perfil' || lower === '!perfil') {
+                if (lower === '!admin perfil' || lower === '!ia perfil' || lower === '!nobazzy perfil' || lower === '!perfil') {
                     await sendBotMessage(currentChatJid, getProfileText());
                     return;
                 }
