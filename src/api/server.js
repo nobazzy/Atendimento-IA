@@ -78,17 +78,39 @@ function createServer() {
 
     app.post('/api/auth/login', (req, res) => {
         const { password, companyId } = req.body;
-        // Se REQUIRE_AUTH estiver ativo e houver senha cadastrada, valida
+
+        // 1. Validar senha de acesso se autenticação for obrigatória
         if (REQUIRE_AUTH && ADMIN_PASSWORD) {
-            if (password !== ADMIN_PASSWORD) {
+            if (!password || password !== ADMIN_PASSWORD) {
                 addAuditLog('Anonymous', 'LOGIN_FAILED', 'Tentativa de login com senha incorreta', '🔴');
                 return res.status(401).json({ success: false, error: 'Senha incorreta.' });
             }
         }
 
-        const token = generateToken({ role: 'admin', companyId: companyId || 'default' });
-        addAuditLog('Admin', 'LOGIN_SUCCESS', 'Login efetuado com sucesso via painel web');
-        res.json({ success: true, token, companyId: companyId || 'default' });
+        // 2. Validação estrita da empresa no banco SQLite para impedir spoofing de tenant
+        const targetCompanyId = (companyId || 'default').trim();
+        const company = db.prepare('SELECT id, name FROM companies WHERE id = ?').get(targetCompanyId);
+        if (!company) {
+            return res.status(404).json({
+                success: false,
+                error: `Empresa '${targetCompanyId}' não encontrada ou não cadastrada no sistema.`
+            });
+        }
+
+        // 3. Emissão de token assinado vinculado à empresa validada
+        const token = generateToken({
+            role: 'admin',
+            companyId: company.id,
+            companyName: company.name
+        });
+
+        addAuditLog('Admin', 'LOGIN_SUCCESS', `Login efetuado com sucesso para a empresa: ${company.name} (${company.id})`);
+        res.json({
+            success: true,
+            token,
+            companyId: company.id,
+            companyName: company.name
+        });
     });
 
     // ─── MIDDLEWARE DE PROTEÇÃO GLOBAL PARA /API/* ───

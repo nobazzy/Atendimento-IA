@@ -1,11 +1,26 @@
 const crypto = require('crypto');
 const config = require('../config');
 
-// Chave secreta para assinatura dos tokens (gerada aleatoriamente em runtime se não definida no .env)
-const JWT_SECRET = process.env.JWT_SECRET || process.env.ADMIN_PASSWORD || crypto.randomBytes(32).toString('hex');
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+// Chave secreta estável para assinatura dos tokens
+let JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    JWT_SECRET = crypto.randomBytes(32).toString('hex');
+    console.warn('⚠️ [SEGURANÇA] JWT_SECRET não configurado no .env. Uma chave temporária foi gerada em runtime. Defina JWT_SECRET no .env para manter sessões ativas após reinicializações.');
+}
+
+let ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const REQUIRE_AUTH = process.env.REQUIRE_AUTH === 'true' || Boolean(ADMIN_PASSWORD);
 const DISABLE_KILL_SWITCH = process.env.DISABLE_KILL_SWITCH === 'true';
+
+// Se REQUIRE_AUTH estiver ativado mas sem ADMIN_PASSWORD definida, gera senha temporária segura
+if (REQUIRE_AUTH && !ADMIN_PASSWORD) {
+    ADMIN_PASSWORD = crypto.randomBytes(16).toString('hex');
+    console.warn('\n======================================================================');
+    console.warn('🔐 [AVISO DE SEGURANÇA] REQUIRE_AUTH está ativo, mas ADMIN_PASSWORD não foi definida!');
+    console.warn(`🔑 SENHA DE ADMIN TEMPORÁRIA GERADA: ${ADMIN_PASSWORD}`);
+    console.warn('👉 Defina ADMIN_PASSWORD no seu arquivo .env para fixar sua senha.');
+    console.warn('======================================================================\n');
+}
 
 /**
  * Gera um token assinado (HMAC-SHA256) com payload codificado em base64url.
@@ -28,30 +43,42 @@ function generateToken(payload, expiresInSeconds = 7 * 24 * 60 * 60) {
 
 /**
  * Valida o token e retorna o payload decodificado se válido.
+ * Trata exceções e valida tamanhos de buffers antes de timingSafeEqual.
  */
 function verifyToken(token) {
     if (!token || typeof token !== 'string') return null;
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-
-    const [encodedHeader, encodedBody, signature] = parts;
-    const expectedSignature = crypto
-        .createHmac('sha256', JWT_SECRET)
-        .update(`${encodedHeader}.${encodedBody}`)
-        .digest('base64url');
-
-    // Validação em tempo constante contra timing attacks
-    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
-        return null;
-    }
 
     try {
+        const parts = token.split('.');
+        if (parts.length !== 3) return null;
+
+        const [encodedHeader, encodedBody, signature] = parts;
+        const expectedSignature = crypto
+            .createHmac('sha256', JWT_SECRET)
+            .update(`${encodedHeader}.${encodedBody}`)
+            .digest('base64url');
+
+        const sigBuf = Buffer.from(signature, 'utf8');
+        const expectedBuf = Buffer.from(expectedSignature, 'utf8');
+
+        // crypto.timingSafeEqual() exige buffers de mesmo tamanho.
+        // Se os comprimentos diferirem, a assinatura é inválida.
+        if (sigBuf.length !== expectedBuf.length) {
+            return null;
+        }
+
+        // Validação em tempo constante contra timing attacks
+        if (!crypto.timingSafeEqual(sigBuf, expectedBuf)) {
+            return null;
+        }
+
         const payload = JSON.parse(Buffer.from(encodedBody, 'base64url').toString('utf8'));
         if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
             return null; // Token expirado
         }
         return payload;
     } catch (e) {
+        // Captura tokens malformados, JSON inválido ou buffers corrompidos
         return null;
     }
 }

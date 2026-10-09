@@ -15,6 +15,6 @@ services:
       - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
       - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
     volumes:
-      - ./data_auth:/.wwebjs_auth
+      - ./data_auth:/app/.wwebjs_auth
       - ./database.sqlite:/app/database.sqlite
       - ./.env:/app/.env
