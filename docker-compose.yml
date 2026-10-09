@@ -8,13 +8,20 @@ services:
     ports:
       # Segurança: Vincula a 127.0.0.1 para evitar exposição direta na internet pública.
       # Utilize um reverse proxy (Caddy / Nginx com HTTPS) na frente.
-      # Para expor diretamente em ambiente de desenvolvimento fechado, use "3000:3000".
+      # Para testes diretos em rede privada, use "3000:3000".
       - "127.0.0.1:3000:3000"
     environment:
       - PORT=3000
       - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
       - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
     volumes:
+      # 1. Sessão do WhatsApp autenticada
       - ./data_auth:/app/.wwebjs_auth
+      # 2. Banco de dados SQLite persistente
       - ./database.sqlite:/app/database.sqlite
+      # 3. Documentos, PDFs e planilhas enviados para a base de conhecimento RAG
+      - ./uploads:/app/uploads
+      # 4. Backups automáticos gerados pelo sistema
+      - ./backups:/app/backups
+      # 5. Configurações de ambiente
       - ./.env:/app/.env
