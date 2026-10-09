@@ -25,8 +25,9 @@ const {
 } = require('../services/rag');
 const { backupDatabase, getBackupList } = require('../services/backups');
 const { testPromptPlayground, getLlmTelemetry } = require('../core/llm');
-const { getWhatsAppStatus, sendBotMessage, syncWhatsAppContacts, resolveSingleLid, disconnectWhatsApp, reconnectWhatsApp } = require('../core/whatsapp');
+const { getWhatsAppStatus, sendBotMessage, syncWhatsAppContacts, resolveSingleLid, disconnectWhatsApp, reconnectWhatsApp, setGlobalPaused } = require('../core/whatsapp');
 const { getSystemHealth } = require('../core/scheduler');
+const { requireAuth, generateToken, verifyToken, REQUIRE_AUTH, ADMIN_PASSWORD, DISABLE_KILL_SWITCH } = require('./auth');
 
 function createServer() {
     const app = express();
@@ -51,13 +52,61 @@ function createServer() {
         }
     }));
 
+    // ─── ROTAS PÚBLICAS DE AUTENTICAÇÃO & HEALTHCHECK ───
+    app.get('/api/health', (req, res) => {
+        res.json({ status: 'ok', uptime: Math.round(process.uptime()), timestamp: new Date().toISOString() });
+    });
+
+    app.get('/api/auth/status', (req, res) => {
+        const authHeader = req.headers['authorization'];
+        const queryToken = req.query.token;
+        let token = null;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            token = authHeader.substring(7).trim();
+        } else if (queryToken) {
+            token = String(queryToken).trim();
+        }
+
+        const decoded = token ? verifyToken(token) : null;
+        res.json({
+            success: true,
+            requireAuth: REQUIRE_AUTH,
+            authenticated: !REQUIRE_AUTH || Boolean(decoded),
+            user: decoded || (REQUIRE_AUTH ? null : { role: 'admin', companyId: 'default' })
+        });
+    });
+
+    app.post('/api/auth/login', (req, res) => {
+        const { password, companyId } = req.body;
+        // Se REQUIRE_AUTH estiver ativo e houver senha cadastrada, valida
+        if (REQUIRE_AUTH && ADMIN_PASSWORD) {
+            if (password !== ADMIN_PASSWORD) {
+                addAuditLog('Anonymous', 'LOGIN_FAILED', 'Tentativa de login com senha incorreta', '🔴');
+                return res.status(401).json({ success: false, error: 'Senha incorreta.' });
+            }
+        }
+
+        const token = generateToken({ role: 'admin', companyId: companyId || 'default' });
+        addAuditLog('Admin', 'LOGIN_SUCCESS', 'Login efetuado com sucesso via painel web');
+        res.json({ success: true, token, companyId: companyId || 'default' });
+    });
+
+    // ─── MIDDLEWARE DE PROTEÇÃO GLOBAL PARA /API/* ───
+    app.use('/api', (req, res, next) => {
+        const publicPaths = ['/health', '/auth/login', '/auth/status', '/onboarding/status'];
+        if (publicPaths.includes(req.path)) {
+            return next();
+        }
+        return requireAuth(req, res, next);
+    });
+
     // ─── ONBOARDING WIZARD ───
     app.get('/api/onboarding/status', (req, res) => {
         res.json({ success: true, onboarded: getOnboardingStatus() });
     });
 
     app.post('/api/onboarding/setup', (req, res) => {
-        const result = completeOnboarding(req.body, 'Alex');
+        const result = completeOnboarding(req.body, req.user ? req.user.role : 'Alex');
         res.json(result);
     });
 
@@ -108,7 +157,8 @@ function createServer() {
 
     // ─── RAG KNOWLEDGE BASE (DOCUMENTOS, PLANILHAS & URLS) ───
     app.get(['/api/rag/docs', '/api/training/docs'], (req, res) => {
-        res.json({ success: true, docs: getRagDocs() });
+        const companyId = req.companyId || 'default';
+        res.json({ success: true, docs: getRagDocs(companyId) });
     });
 
     app.post('/api/rag/upload', upload.array('files', 10), async (req, res) => {
@@ -117,10 +167,12 @@ function createServer() {
                 return res.status(400).json({ success: false, error: 'Nenhum arquivo enviado.' });
             }
 
+            const companyId = req.companyId || req.body.companyId || 'default';
+            const user = req.user ? req.user.role : 'Alex';
             const keywords = req.body.keywords || '';
             const results = [];
             for (const file of req.files) {
-                const indexed = await indexUploadedFile(file, 'Alex', 'default', keywords);
+                const indexed = await indexUploadedFile(file, user, companyId, keywords);
                 results.push(indexed);
             }
 
@@ -134,7 +186,9 @@ function createServer() {
     app.post(['/api/rag/text', '/api/training/docs'], (req, res) => {
         try {
             const { title, type, content, source, keywords } = req.body;
-            const doc = indexManualText(title, content, type, source, 'Alex', 'default', keywords || '');
+            const companyId = req.companyId || req.body.companyId || 'default';
+            const user = req.user ? req.user.role : 'Alex';
+            const doc = indexManualText(title, content, type, source, user, companyId, keywords || '');
             res.json({ success: Boolean(doc), doc });
         } catch (err) {
             res.status(500).json({ success: false, error: err.message });
@@ -144,7 +198,9 @@ function createServer() {
     app.put('/api/rag/docs/:id/keywords', (req, res) => {
         try {
             const { keywords } = req.body;
-            const ok = updateDocKeywords(req.params.id, keywords, 'Alex');
+            const companyId = req.companyId || 'default';
+            const user = req.user ? req.user.role : 'Alex';
+            const ok = updateDocKeywords(req.params.id, keywords, user, companyId);
             res.json({ success: ok, keywords });
         } catch (err) {
             res.status(500).json({ success: false, error: err.message });
@@ -152,7 +208,8 @@ function createServer() {
     });
 
     app.get('/api/rag/docs/:id/preview', (req, res) => {
-        const preview = getRagDocPreview(req.params.id);
+        const companyId = req.companyId || 'default';
+        const preview = getRagDocPreview(req.params.id, companyId);
         if (!preview) return res.status(404).json({ success: false, error: 'Documento não encontrado' });
         res.json({ 
             success: true, 
@@ -163,13 +220,16 @@ function createServer() {
     });
 
     app.delete(['/api/rag/docs/:id', '/api/training/docs/:id'], (req, res) => {
-        const ok = deleteRagDoc(req.params.id, 'Alex');
+        const companyId = req.companyId || 'default';
+        const user = req.user ? req.user.role : 'Alex';
+        const ok = deleteRagDoc(req.params.id, user, companyId);
         res.json({ success: ok });
     });
 
     app.post('/api/rag/test-search', (req, res) => {
         const { query } = req.body;
-        const chunks = searchRagChunks(query, 'default', 5);
+        const companyId = req.companyId || 'default';
+        const chunks = searchRagChunks(query, companyId, 5);
         res.json({ success: true, query, count: chunks.length, chunks });
     });
 
@@ -572,9 +632,17 @@ function createServer() {
     app.post('/api/system/action', (req, res) => {
         const { action } = req.body;
         if (action === 'kill') {
-            addAuditLog('Alex', 'Kill Switch Acionado pelo Painel Web', 'Servidor encerrado', '🔴');
+            if (DISABLE_KILL_SWITCH) {
+                return res.status(403).json({ success: false, error: 'O comando de encerramento remoto (Kill Switch) está desativado nesta instalação.' });
+            }
+            addAuditLog(req.user ? req.user.role : 'Alex', 'Kill Switch Acionado pelo Painel Web', 'Servidor encerrado', '🔴');
             res.json({ success: true, message: 'Servidor sendo desligado...' });
             setTimeout(() => process.exit(0), 1000);
+        } else if (action === 'pause' || action === 'resume') {
+            const paused = action === 'pause';
+            setGlobalPaused(paused);
+            addAuditLog(req.user ? req.user.role : 'Alex', paused ? 'Pausou IA' : 'Reativou IA', `Pausa global alterada para: ${paused}`);
+            res.json({ success: true, paused });
         } else {
             res.status(400).json({ success: false, error: 'Ação desconhecida' });
         }

@@ -6,7 +6,10 @@ services:
     container_name: atendimento_ia_app
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      # Segurança: Vincula a 127.0.0.1 para evitar exposição direta na internet pública.
+      # Utilize um reverse proxy (Caddy / Nginx com HTTPS) na frente.
+      # Para expor diretamente em ambiente de desenvolvimento fechado, use "3000:3000".
+      - "127.0.0.1:3000:3000"
     environment:
       - PORT=3000
       - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true

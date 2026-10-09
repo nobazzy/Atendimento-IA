@@ -4,7 +4,7 @@ const QRCode = require('qrcode');
 const fs = require('fs');
 const path = require('path');
 const config = require('../../config');
-const { db } = require('../../database');
+const { db, isMessageProcessed, markMessageProcessed, cleanupOldProcessedMessages } = require('../../database');
 const { broadcastLog } = require('../../services/logs');
 const { getActivePersonalityPrompt } = require('../../services/prompts');
 const { getFormattedTrainingContext, getKnowledgeDocs } = require('../../services/training');
@@ -217,8 +217,34 @@ const client = new Client({
     }
 });
 
+function getPersistedGlobalPaused() {
+    try {
+        const row = db.prepare("SELECT value FROM system_config WHERE key = 'global_paused'").get();
+        return row ? row.value === 'true' : false;
+    } catch (e) {
+        return false;
+    }
+}
+
+function setPersistedGlobalPaused(val) {
+    try {
+        const nowStr = new Date().toISOString();
+        db.prepare(`
+            INSERT INTO system_config (key, value, company_id, updated_at) 
+            VALUES ('global_paused', ?, 'default', ?) 
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+        `).run(val ? 'true' : 'false', nowStr);
+    } catch (e) {}
+}
+
 let isReady = false;
-let globalIsPaused = false;
+let globalIsPaused = getPersistedGlobalPaused();
+
+function setGlobalPaused(paused) {
+    globalIsPaused = Boolean(paused);
+    setPersistedGlobalPaused(globalIsPaused);
+    return globalIsPaused;
+}
 let isDisconnecting = false;
 let currentQrRaw = null;
 let currentQrDataUrl = null;
@@ -827,8 +853,9 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
 
         const msgIdStr = (msg.id && (msg.id._serialized || msg.id.id)) ? (msg.id._serialized || msg.id.id) : null;
         if (msgIdStr) {
-            if (processedMsgIds.has(msgIdStr)) return;
+            if (processedMsgIds.has(msgIdStr) || isMessageProcessed(msgIdStr)) return;
             processedMsgIds.add(msgIdStr);
+            markMessageProcessed(msgIdStr);
             if (processedMsgIds.size > 2000) {
                 const first = processedMsgIds.values().next().value;
                 processedMsgIds.delete(first);
@@ -997,13 +1024,13 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
                 }
 
                 if (lower === '!pausar' || lower === '!admin pausar' || lower === '!ia pausar' || lower === '!admin pausar') {
-                    globalIsPaused = true;
+                    setGlobalPaused(true);
                     broadcastLog('system', 'IA Pausada (Silencioso)', 'Cloud entrou em Modo Silencioso', '🔴');
                     return;
                 }
 
                 if (lower === '!retomar' || lower === '!admin retomar' || lower === '!ia retomar' || lower === '!admin retomar') {
-                    globalIsPaused = false;
+                    setGlobalPaused(false);
                     broadcastLog('system', 'IA Reativada (Silencioso)', 'Cloud voltou a atender', '🟢');
                     return;
                 }
@@ -1119,13 +1146,13 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
                 }
 
                 if (lower === '!pausar' || lower === '!admin pausar' || lower === '!ia pausar' || lower === '!admin pausar') {
-                    globalIsPaused = true;
+                    setGlobalPaused(true);
                     await sendBotMessage(currentChatJid, '⏸️ *CLOUD PAUSADA (MODO SILENCIOSO)*');
                     return;
                 }
 
                 if (lower === '!retomar' || lower === '!admin retomar' || lower === '!ia retomar' || lower === '!admin retomar') {
-                    globalIsPaused = false;
+                    setGlobalPaused(false);
                     await sendBotMessage(currentChatJid, '▶️ *CLOUD REATIVADA COM SUCESSO!*');
                     return;
                 }
@@ -1686,5 +1713,6 @@ module.exports = {
     reconnectWhatsApp,
     syncWhatsAppContacts,
     resolveSingleLid,
-    buildSystemPrompt
+    buildSystemPrompt,
+    setGlobalPaused
 };

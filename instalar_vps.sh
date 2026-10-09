@@ -23,10 +23,10 @@ sudo apt-get install -y curl git build-essential ca-certificates \
     libgbm1 libasound2 libpango-1.0-0 libcairo2 libx11-xcb1 \
     libxcb-dri3-0 fonts-liberation
 
-# 3. Instalar Node.js v20 LTS caso não esteja presente
+# 3. Instalar Node.js v22 LTS (necessário para node:sqlite nativo) caso não esteja presente
 if ! command -v node &> /dev/null; then
-    echo "[3/6] Instalando Node.js v20 LTS..."
-    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+    echo "[3/6] Instalando Node.js v22 LTS..."
+    curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
     sudo apt-get install -y nodejs
 else
     echo "[3/6] Node.js já instalado: $(node -v)"

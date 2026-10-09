@@ -213,6 +213,13 @@ function initDatabase() {
                 company_id TEXT DEFAULT 'default',
                 timestamp TEXT NOT NULL
             );
+
+            -- DEDUPLICAÇÃO PERSISTENTE DE MENSAGENS (SOBREVIVE A REINICIALIZAÇÃO)
+            CREATE TABLE IF NOT EXISTS processed_messages (
+                msg_id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_processed_messages_created ON processed_messages(created_at);
         `);
 
         // Migration safety checks
@@ -307,10 +314,37 @@ function initDatabase() {
     }
 }
 
+function isMessageProcessed(msgId) {
+    if (!msgId) return false;
+    try {
+        const row = db.prepare('SELECT msg_id FROM processed_messages WHERE msg_id = ?').get(String(msgId));
+        return Boolean(row);
+    } catch (e) {
+        return false;
+    }
+}
+
+function markMessageProcessed(msgId) {
+    if (!msgId) return;
+    try {
+        db.prepare('INSERT OR IGNORE INTO processed_messages (msg_id, created_at) VALUES (?, ?)').run(String(msgId), new Date().toISOString());
+    } catch (e) {}
+}
+
+function cleanupOldProcessedMessages(days = 7) {
+    try {
+        const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+        db.prepare('DELETE FROM processed_messages WHERE created_at < ?').run(cutoff);
+    } catch (e) {}
+}
+
 initDatabase();
 
 module.exports = {
     db,
     sanitizeInput,
-    initDatabase
+    initDatabase,
+    isMessageProcessed,
+    markMessageProcessed,
+    cleanupOldProcessedMessages
 };

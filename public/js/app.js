@@ -1,4 +1,99 @@
+// ─── INTERCEPTOR GLOBAL DE AUTENTICAÇÃO (BEARER TOKEN & SESSÃO) ───
+const originalFetch = window.fetch;
+window.fetch = async function (url, options = {}) {
+    options = options || {};
+    options.headers = options.headers || {};
+
+    const token = localStorage.getItem('auth_token');
+    if (token && typeof url === 'string' && url.startsWith('/api/') && !url.includes('/api/auth/login')) {
+        if (options.headers instanceof Headers) {
+            if (!options.headers.has('Authorization')) options.headers.set('Authorization', `Bearer ${token}`);
+        } else if (Array.isArray(options.headers)) {
+            options.headers.push(['Authorization', `Bearer ${token}`]);
+        } else {
+            if (!options.headers['Authorization']) options.headers['Authorization'] = `Bearer ${token}`;
+        }
+    }
+
+    const response = await originalFetch(url, options);
+
+    // Se retornar 401 Unauthorized, exibir modal de login
+    if (response.status === 401 && typeof url === 'string' && url.startsWith('/api/')) {
+        showAuthModal();
+    }
+
+    return response;
+};
+
+function showAuthModal() {
+    const modal = document.getElementById('auth-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        const input = document.getElementById('auth-password-input');
+        if (input) setTimeout(() => input.focus(), 100);
+    }
+}
+
+function hideAuthModal() {
+    const modal = document.getElementById('auth-modal');
+    if (modal) modal.style.display = 'none';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    // ─── INICIALIZAÇÃO DE AUTENTICAÇÃO NO FRONTEND ───
+    async function checkAuthStatus() {
+        try {
+            const res = await fetch('/api/auth/status');
+            const data = await res.json();
+            if (data.requireAuth && !data.authenticated) {
+                showAuthModal();
+            } else {
+                hideAuthModal();
+            }
+        } catch (e) {}
+    }
+    checkAuthStatus();
+
+    const formAuth = document.getElementById('form-auth-login');
+    if (formAuth) {
+        formAuth.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const password = document.getElementById('auth-password-input').value;
+            const errorDiv = document.getElementById('auth-error-msg');
+            errorDiv.style.display = 'none';
+
+            try {
+                const res = await originalFetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                const data = await res.json();
+                if (data.success && data.token) {
+                    localStorage.setItem('auth_token', data.token);
+                    hideAuthModal();
+                    window.location.reload();
+                } else {
+                    errorDiv.innerText = data.error || 'Senha incorreta. Tente novamente.';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (err) {
+                errorDiv.innerText = 'Erro ao conectar ao servidor.';
+                errorDiv.style.display = 'block';
+            }
+        });
+    }
+
+    const btnLock = document.getElementById('btn-auth-lock');
+    if (btnLock) {
+        btnLock.addEventListener('click', () => {
+            if (confirm('Deseja realmente sair e bloquear o painel?')) {
+                localStorage.removeItem('auth_token');
+                showAuthModal();
+            }
+        });
+    }
+
     // ─── CHECK ONBOARDING WIZARD STATUS ───
     async function checkOnboarding() {
         try {
@@ -785,7 +880,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ─── SSE LOGS EM TEMPO REAL ───
-    const evtSource = new EventSource('/api/logs/stream');
+    const sseToken = localStorage.getItem('auth_token');
+    const sseUrl = sseToken ? `/api/logs/stream?token=${encodeURIComponent(sseToken)}` : '/api/logs/stream';
+    const evtSource = new EventSource(sseUrl);
     const logsBody = document.getElementById('logs-table-body');
 
     evtSource.onmessage = (event) => {

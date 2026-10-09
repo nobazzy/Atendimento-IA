@@ -304,13 +304,20 @@ function indexManualText(title, content, type = 'txt', source = '', user = 'Admi
 }
 
 // ─── ATUALIZAÇÃO DE PALAVRAS-GATILHO DE UM DOCUMENTO ───
-function updateDocKeywords(docId, keywords, user = 'Admin') {
+function updateDocKeywords(docId, keywords, user = 'Admin', companyId = 'default') {
     try {
         const sKeywords = sanitizeInput(keywords || '');
+        const doc = db.prepare('SELECT id, company_id FROM knowledge_docs WHERE id = ?').get(docId);
+        if (!doc) return false;
+        if (companyId && doc.company_id !== companyId) {
+            console.warn(`⛔ [RAG SECURITY] Tenant ${companyId} tentou editar doc #${docId} da empresa ${doc.company_id}`);
+            return false;
+        }
+
         const stmt = db.prepare('UPDATE knowledge_docs SET keywords = ? WHERE id = ?');
         const res = stmt.run(sKeywords, docId);
         if (res.changes > 0) {
-            addAuditLog(user, 'Atualizou Gatilhos RAG', `Doc #${docId}: ${sKeywords || '(limpos)'}`, '🔵');
+            addAuditLog(user, 'Atualizou Gatilhos RAG', `Doc #${docId}: ${sKeywords || '(limpos)'}`, '🔵', companyId);
             return true;
         }
         return false;
@@ -320,13 +327,13 @@ function updateDocKeywords(docId, keywords, user = 'Admin') {
     }
 }
 
-// ─── LISTAGEM DE DOCUMENTOS ───
+// ─── LISTAGEM DE DOCUMENTOS ISOLADA POR EMPRESA ───
 function getKnowledgeDocs(companyId = 'default') {
     try {
         const stmt = db.prepare(`
             SELECT id, title, filename, type, file_size, chunk_count, keywords, source, active, created_at
             FROM knowledge_docs
-            WHERE company_id = ? OR company_id = 'default'
+            WHERE company_id = ?
             ORDER BY id DESC
         `);
         return stmt.all(companyId);
@@ -336,11 +343,15 @@ function getKnowledgeDocs(companyId = 'default') {
     }
 }
 
-// ─── PRÉ-VISUALIZAÇÃO DE DOCUMENTO (PRIMEIROS CHUNKS) ───
-function getDocPreview(docId, limit = 8) {
+// ─── PRÉ-VISUALIZAÇÃO DE DOCUMENTO COM VALIDAÇÃO DE POSSE ───
+function getDocPreview(docId, companyId = 'default', limit = 8) {
     try {
-        const doc = db.prepare('SELECT id, title, type, chunk_count, keywords FROM knowledge_docs WHERE id = ?').get(docId);
+        const doc = db.prepare('SELECT id, title, type, chunk_count, keywords, company_id FROM knowledge_docs WHERE id = ?').get(docId);
         if (!doc) return null;
+        if (companyId && doc.company_id !== companyId) {
+            console.warn(`⛔ [RAG SECURITY] Tenant ${companyId} tentou visualizar doc #${docId} da empresa ${doc.company_id}`);
+            return null;
+        }
 
         const chunks = db.prepare('SELECT chunk_index, content, metadata FROM knowledge_chunks WHERE doc_id = ? ORDER BY chunk_index ASC LIMIT ?').all(docId, limit);
         return { doc, chunks };
@@ -350,11 +361,16 @@ function getDocPreview(docId, limit = 8) {
     }
 }
 
-// ─── EXCLUSÃO DE DOCUMENTO & CHUNKS ───
-function deleteKnowledgeDoc(id, user = 'Admin') {
+// ─── EXCLUSÃO SEGURA DE DOCUMENTO & CHUNKS POR EMPRESA ───
+function deleteKnowledgeDoc(id, user = 'Admin', companyId = 'default') {
     try {
-        const doc = db.prepare('SELECT id, title, file_path FROM knowledge_docs WHERE id = ?').get(id);
+        const doc = db.prepare('SELECT id, title, file_path, company_id FROM knowledge_docs WHERE id = ?').get(id);
         if (!doc) return false;
+
+        if (companyId && doc.company_id !== companyId) {
+            console.warn(`⛔ [RAG SECURITY] Tenant ${companyId} tentou excluir doc #${id} pertencente à empresa ${doc.company_id}`);
+            return false;
+        }
 
         // Remove arquivo físico se existir
         if (doc.file_path && fs.existsSync(doc.file_path)) {
@@ -365,7 +381,7 @@ function deleteKnowledgeDoc(id, user = 'Admin') {
         db.prepare('DELETE FROM knowledge_chunks WHERE doc_id = ?').run(id);
         db.prepare('DELETE FROM knowledge_docs WHERE id = ?').run(id);
 
-        addAuditLog(user, 'Removeu Documento RAG', `Título: ${doc.title} (ID: ${id})`, '🔴');
+        addAuditLog(user, 'Removeu Documento RAG', `Título: ${doc.title} (ID: ${id}) [Empresa: ${doc.company_id}]`, '🔴', companyId);
         return true;
     } catch (e) {
         console.error('⚠️ Erro ao excluir documento RAG:', e.message);
@@ -373,7 +389,7 @@ function deleteKnowledgeDoc(id, user = 'Admin') {
     }
 }
 
-// ─── RECUPERADOR DE RELEVÂNCIA RAG (SMART RETRIEVAL) ───
+// ─── RECUPERADOR DE RELEVÂNCIA RAG (ESTRITAMENTE ISOLADO POR TENANT) ───
 function retrieveRelevantChunks(query, companyId = 'default', limit = 4) {
     try {
         if (!query || typeof query !== 'string' || query.trim().length < 3) {
@@ -383,12 +399,12 @@ function retrieveRelevantChunks(query, companyId = 'default', limit = 4) {
         const keywords = extractKeywords(query);
         if (keywords.length === 0) return [];
 
-        // Busca todos os fragmentos de documentos ativos
+        // Busca fragmentos estritamente isolados da empresa requisitante
         const chunks = db.prepare(`
             SELECT c.id, c.doc_id, c.chunk_index, c.content, d.title, d.type, d.keywords
             FROM knowledge_chunks c
             INNER JOIN knowledge_docs d ON d.id = c.doc_id
-            WHERE d.active = 1 AND (c.company_id = ? OR c.company_id = 'default')
+            WHERE d.active = 1 AND c.company_id = ?
         `).all(companyId);
 
         if (chunks.length === 0) return [];

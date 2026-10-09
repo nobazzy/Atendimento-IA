@@ -230,8 +230,31 @@
                     <i data-lucide="moon" style="width:14px; height:14px;" id="theme-toggle-icon"></i>
                     <span id="theme-toggle-label">Modo Escuro</span>
                 </button>
+                <button class="btn btn-secondary btn-sm" id="btn-auth-lock" title="Bloquear Painel / Desconectar" style="display:flex; align-items:center; gap:0.4rem; padding:0.45rem 0.8rem; font-size:0.78rem; font-weight:600; border-radius:8px;">
+                    <i data-lucide="lock" style="width:14px; height:14px;"></i>
+                    <span>Sair</span>
+                </button>
             </div>
         </header>
+
+        <!-- MODAL DE AUTENTICAÇÃO / LOGIN -->
+        <div id="auth-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:999999; align-items:center; justify-content:center; padding:1rem;">
+            <div style="background:var(--bg-card, #1e293b); border:1px solid var(--border-color, #334155); border-radius:14px; padding:2.5rem 2rem; width:100%; max-width:400px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5); text-align:center;">
+                <div style="width:54px; height:54px; border-radius:14px; background:rgba(59,130,246,0.15); display:inline-flex; align-items:center; justify-content:center; margin-bottom:1.2rem; color:#3b82f6;">
+                    <i data-lucide="shield-check" style="width:32px; height:32px;"></i>
+                </div>
+                <h3 style="margin-bottom:0.5rem; font-size:1.3rem; font-weight:700; color:var(--text-main, #f8fafc);">Acesso Protegido</h3>
+                <p style="font-size:0.85rem; color:var(--text-muted, #94a3b8); margin-bottom:1.8rem;">Insira a senha de administrador configurada no backend para acessar o painel.</p>
+                <form id="form-auth-login">
+                    <div style="margin-bottom:1.2rem; text-align:left;">
+                        <label style="font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-muted, #94a3b8); margin-bottom:0.4rem; display:block;">Senha de Acesso</label>
+                        <input type="password" id="auth-password-input" class="form-control" style="width:100%; padding:0.8rem; border-radius:8px;" placeholder="Digite a senha do admin..." required autofocus>
+                    </div>
+                    <div id="auth-error-msg" style="display:none; color:#ef4444; font-size:0.82rem; margin-bottom:1.2rem; font-weight:500;"></div>
+                    <button type="submit" class="btn btn-primary" style="width:100%; padding:0.85rem; border-radius:8px; font-weight:600; cursor:pointer;">Entrar no Painel</button>
+                </form>
+            </div>
+        </div>
 
         <main class="content-body">
 
