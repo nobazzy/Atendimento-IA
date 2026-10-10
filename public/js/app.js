@@ -546,7 +546,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (ragUploadStatus) {
             ragUploadStatus.style.display = 'block';
-            ragUploadStatus.innerHTML = `<span style="color:var(--brand-blue);"><i data-lucide="loader" style="width:13px;height:13px;animation:spin 1s linear infinite;display:inline-block;vertical-align:middle;"></i> Processando e indexando ${fileList.length} arquivo(s)...</span>`;
+            ragUploadStatus.innerHTML = `<span style="color:var(--brand-blue);"><i data-lucide="loader" style="width:13px;height:13px;animation:spin 1s linear infinite;display:inline-block;vertical-align:middle;"></i> Enviando lote com ${fileList.length} arquivo(s)... A IA está analisando conteúdo, mapeando categorias e gerando palavras-gatilho...</span>`;
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
@@ -569,9 +569,26 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.success) {
                 const uploadedDocs = data.docs || data.results || [];
                 const totalChunks = uploadedDocs.reduce((acc, r) => acc + (r.chunk_count || r.chunkCount || 0), 0);
+                
+                let detailsHtml = '';
+                if (uploadedDocs.length > 0) {
+                    const previewItems = uploadedDocs.slice(0, 3).map(d => {
+                        const cat = d.category ? ` [${escapeHtml(d.category)}]` : '';
+                        const kw = d.keywords ? ` - Gatilhos: <em>${escapeHtml(d.keywords.slice(0, 70))}...</em>` : '';
+                        return `• <strong>${escapeHtml(d.title)}</strong>${cat}${kw}`;
+                    }).join('<br>');
+                    detailsHtml = `<div style="font-size:0.75rem; margin-top:0.35rem; color:var(--text-muted);">${previewItems}</div>`;
+                }
+
                 if (ragUploadStatus) {
-                    ragUploadStatus.innerHTML = `<span style="color:var(--brand-emerald-text);"><i data-lucide="check-circle" style="width:13px;height:13px;display:inline-block;vertical-align:middle;"></i> ✅ Sucesso! ${uploadedDocs.length} arquivo(s) indexado(s) com ${totalChunks} blocos de conhecimento gerados.</span>`;
-                    setTimeout(() => { if (ragUploadStatus) ragUploadStatus.style.display = 'none'; }, 5000);
+                    ragUploadStatus.innerHTML = `
+                        <div style="color:var(--brand-emerald-text);">
+                            <i data-lucide="check-circle" style="width:13px;height:13px;display:inline-block;vertical-align:middle;"></i>
+                            <strong>✅ Lote processado!</strong> ${uploadedDocs.length} arquivo(s) indexado(s) com ${totalChunks} blocos gerados e mapeados pela IA.
+                        </div>
+                        ${detailsHtml}
+                    `;
+                    setTimeout(() => { if (ragUploadStatus) ragUploadStatus.style.display = 'none'; }, 8000);
                 }
                 const kwInp = document.getElementById('rag-file-keywords');
                 if (kwInp) kwInp.value = '';

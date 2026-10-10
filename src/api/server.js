@@ -1,4 +1,5 @@
 const express = require('express');
+const multer = require('multer');
 const path = require('path');
 const config = require('../config');
 const { db } = require('../database');
@@ -183,24 +184,82 @@ function createServer() {
         res.json({ success: true, docs: getRagDocs(companyId) });
     });
 
-    app.post('/api/rag/upload', upload.array('files', 10), async (req, res) => {
+    // Configuração de upload com suporte flexível a 'files' (múltiplos em lote) ou 'file' (único)
+    const ragUploadMiddleware = (req, res, next) => {
+        upload.fields([
+            { name: 'files', maxCount: 20 },
+            { name: 'file', maxCount: 1 }
+        ])(req, res, (err) => {
+            if (err) {
+                if (err instanceof multer.MulterError) {
+                    if (err.code === 'LIMIT_FILE_SIZE') {
+                        return res.status(400).json({ success: false, error: 'Arquivo excede o tamanho máximo permitido de 25MB.' });
+                    }
+                    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+                        return res.status(400).json({ success: false, error: 'Limite de arquivos por lote excedido (máximo 20 arquivos permitidos por envio).' });
+                    }
+                    return res.status(400).json({ success: false, error: `Erro no upload: ${err.message}` });
+                }
+                return res.status(400).json({ success: false, error: err.message });
+            }
+            next();
+        });
+    };
+
+    app.post('/api/rag/upload', ragUploadMiddleware, async (req, res) => {
         try {
-            if (!req.files || req.files.length === 0) {
-                return res.status(400).json({ success: false, error: 'Nenhum arquivo enviado.' });
+            // Reunir arquivos enviados tanto pelo campo 'files' quanto 'file'
+            const files = [];
+            if (req.files && req.files.files) {
+                files.push(...req.files.files);
+            }
+            if (req.files && req.files.file) {
+                files.push(...req.files.file);
             }
 
-            const companyId = req.companyId || req.body.companyId || 'default';
-            const user = req.user ? req.user.role : 'Alex';
+            if (files.length === 0) {
+                return res.status(400).json({ success: false, error: 'Nenhum arquivo enviado para indexação.' });
+            }
+
+            // Segurança estrita: Empresa sempre herdada do usuário autenticado para evitar spoofing de tenant
+            const companyId = (req.user && req.user.companyId) ? req.user.companyId : (req.companyId || 'default');
+            const user = req.user ? (req.user.companyName ? `${req.user.role} (${req.user.companyName})` : req.user.role) : 'Admin';
             const keywords = req.body.keywords || '';
+
             const results = [];
-            for (const file of req.files) {
-                const indexed = await indexUploadedFile(file, user, companyId, keywords);
-                results.push(indexed);
+            const errors = [];
+
+            for (const file of files) {
+                try {
+                    const indexed = await indexUploadedFile(file, user, companyId, keywords);
+                    results.push(indexed);
+                } catch (fileErr) {
+                    errors.push({
+                        filename: file.originalname,
+                        error: fileErr.message
+                    });
+                }
             }
 
-            res.json({ success: true, count: results.length, docs: results, results });
+            if (results.length === 0 && errors.length > 0) {
+                return res.status(500).json({
+                    success: false,
+                    error: `Falha ao processar arquivo(s): ${errors.map(e => `${e.filename} (${e.error})`).join(', ')}`,
+                    errors
+                });
+            }
+
+            addAuditLog(user, 'Upload em Lote RAG', `Processados: ${results.length} arquivo(s), Erros: ${errors.length}`, errors.length > 0 ? '🟡' : '🟢', companyId);
+
+            res.json({
+                success: true,
+                count: results.length,
+                docs: results,
+                results,
+                errors: errors.length > 0 ? errors : undefined
+            });
         } catch (err) {
-            console.error('❌ Erro no upload RAG:', err.message);
+            console.error('❌ Erro no upload RAG em lote:', err.message);
             res.status(500).json({ success: false, error: err.message });
         }
     });

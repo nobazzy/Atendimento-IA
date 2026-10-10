@@ -601,9 +601,15 @@ ${ragContext}`;
 
         let realName = '';
         let relationshipContext = '';
-        if (dbContact && isHumanName(dbContact.name)) {
-            realName = dbContact.name;
-            relationshipContext = `\n[INFORMAÇÕES DESTE CONTATO / CLIENTE]\n- Nome do Cliente: ${dbContact.name}\n- Relação: ${dbContact.relationship}\n- Notas: ${dbContact.notes || 'Nenhuma'}`;
+        if (dbContact) {
+            if (isHumanName(dbContact.name)) {
+                realName = dbContact.name;
+            }
+            relationshipContext = `\n[INFORMAÇÕES DESTE CONTATO / CLIENTE NO SISTEMA]\n`;
+            if (dbContact.name) relationshipContext += `- Nome Cadastrado: ${dbContact.name}\n`;
+            if (dbContact.relationship) relationshipContext += `- Grau de Relacionamento: ${dbContact.relationship}\n`;
+            if (dbContact.tags) relationshipContext += `- Tags / Segmento: ${dbContact.tags}\n`;
+            if (dbContact.notes) relationshipContext += `- Histórico / Observações: ${dbContact.notes}\n`;
         }
 
         return `${mandatoryPersonaHeader}
@@ -611,8 +617,10 @@ ${ragContext}`;
 [INSTRUÇÕES DE ATENDIMENTO A CLIENTE / TERCEIRO]
 - Você está respondendo a uma mensagem enviada por um cliente ou terceiro no WhatsApp comercial.${relationshipContext}
 - REGRA DE OURO: NUNCA trate o cliente como se fosse o Administrador.
-- ${realName ? `Cumprimente o cliente pelo nome real ('${realName}').` : "Cumprimente o cliente educadamente."}
+- ${realName ? `Cumprimente o cliente pelo nome real ('${realName}') de forma empática e personalizada.` : "Cumprimente o cliente educadamente de forma profissional."}
 - Responda estritamente mantendo a persona '${personalityName}' e as diretrizes definidas no prompt principal da IA ativada acima.
+- Se houver tags ou notas cadastradas sobre o cliente, adapte a conversa às necessidades e histórico dele.
+- Quando houver dados oficiais da Base de Conhecimento RAG abaixo, use-os como fonte primária de verdade para esclarecer dúvidas com exatidão.
 
 ${timeContext}
 ${trainingContext}

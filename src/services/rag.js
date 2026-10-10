@@ -188,6 +188,87 @@ async function processDocument(filePath, originalName, ext) {
     }
 }
 
+// ─── MAPEAMENTO AUTOMÁTICO DE METADADOS & GATILHOS POR IA ───
+async function generateAiMetadata(sampleText, originalName, manualKeywords = '') {
+    let aiKeywords = [];
+    let category = 'Geral';
+    let summary = '';
+    let questions = [];
+
+    // 1. Tentar categorização e extração de palavras-gatilho via IA (LLM configurado)
+    try {
+        const { callAIProvider } = require('../core/llm');
+        const prompt = `Você é um classificador e organizador especialista de bases de conhecimento RAG para atendimento ao cliente no WhatsApp.
+Analise o trecho do documento ("${originalName}") e retorne EXCLUSIVAMENTE um objeto JSON válido, sem texto antes ou depois:
+{
+  "category": "Nome curto da categoria (ex: Preços e Planos, Dúvidas Frequentes, Suporte Técnico, Políticas e Prazos)",
+  "summary": "Resumo executivo de 1 a 2 frases do assunto",
+  "keywords": ["5 a 10 palavras-gatilho ou termos de busca em português que clientes usam para perguntar sobre este assunto"],
+  "questions": ["2 a 3 perguntas que este documento responde com precisão"]
+}
+
+CONTEÚDO DO DOCUMENTO:
+${sampleText.slice(0, 2500)}`;
+
+        const responseText = await callAIProvider([
+            { role: 'system', content: 'Você responde estritamente no formato JSON válido.' },
+            { role: 'user', content: prompt }
+        ], null, 0.2);
+
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (parsed.category) category = String(parsed.category).trim();
+            if (parsed.summary) summary = String(parsed.summary).trim();
+            if (Array.isArray(parsed.keywords)) {
+                aiKeywords = parsed.keywords.map(k => String(k).trim().toLowerCase()).filter(Boolean);
+            }
+            if (Array.isArray(parsed.questions)) {
+                questions = parsed.questions.map(q => String(q).trim()).filter(Boolean);
+            }
+        }
+    } catch (e) {
+        // 2. Fallback Heurístico Robusto se a IA estiver offline ou sem chave configurada
+        const tokens = extractKeywords(sampleText);
+        const freqMap = {};
+        tokens.forEach(t => {
+            if (t.length >= 3) {
+                freqMap[t] = (freqMap[t] || 0) + 1;
+            }
+        });
+        aiKeywords = Object.entries(freqMap)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 8)
+            .map(([word]) => word);
+
+        const ext = path.extname(originalName).toLowerCase();
+        if (['.xlsx', '.xls', '.csv'].includes(ext)) {
+            category = 'Planilha de Dados / Tabela';
+        } else if (ext === '.pdf') {
+            category = 'Documento PDF';
+        } else if (ext === '.docx') {
+            category = 'Documento Word';
+        } else {
+            category = 'Base de Conhecimento';
+        }
+        summary = `Documento ${originalName} indexado com ${sampleText.length} caracteres de conteúdo.`;
+    }
+
+    // 3. Mesclagem inteligente com palavras-chave manuais fornecidas pelo usuário
+    const finalKeywordsSet = new Set();
+    if (manualKeywords && typeof manualKeywords === 'string') {
+        manualKeywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean).forEach(k => finalKeywordsSet.add(k));
+    }
+    aiKeywords.forEach(k => finalKeywordsSet.add(k));
+
+    return {
+        category,
+        summary,
+        keywords: Array.from(finalKeywordsSet).join(', '),
+        questions
+    };
+}
+
 // ─── INDEXAÇÃO DE ARQUIVO ───
 async function indexUploadedFile(file, user = 'Admin', companyId = 'default', keywords = '') {
     try {
@@ -213,16 +294,21 @@ async function indexUploadedFile(file, user = 'Admin', companyId = 'default', ke
             throw new Error('Nenhum texto ou registro válido pôde ser extraído do arquivo.');
         }
 
+        // Amostra de texto dos primeiros fragmentos para análise e extração de gatilhos
+        const sampleText = chunks.slice(0, 3).map(c => c.content).join('\n\n');
+        const aiMetadata = await generateAiMetadata(sampleText, file.originalname, keywords);
+
         const nowStr = new Date().toISOString();
         const title = sanitizeInput(file.originalname);
         const filename = sanitizeInput(file.filename);
         const filePath = sanitizeInput(file.path);
         const fileSize = file.size || 0;
         const chunkCount = chunks.length;
-        const sKeywords = sanitizeInput(keywords || '');
+        const sKeywords = sanitizeInput(aiMetadata.keywords);
+        const sCategory = sanitizeInput(aiMetadata.category);
 
-        // Salvar metadados em knowledge_docs
-        const summaryContent = chunks[0] ? chunks[0].content : '';
+        // Salvar metadados em knowledge_docs (com sumário gerado e palavras-gatilho)
+        const summaryContent = sanitizeInput(aiMetadata.summary || (chunks[0] ? chunks[0].content : ''));
         const insDoc = db.prepare(`
             INSERT INTO knowledge_docs (title, filename, type, content, file_path, file_size, chunk_count, keywords, source, company_id, active, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'upload', ?, 1, ?)
@@ -230,23 +316,37 @@ async function indexUploadedFile(file, user = 'Admin', companyId = 'default', ke
         const docRes = insDoc.run(title, filename, docType, summaryContent, filePath, fileSize, chunkCount, sKeywords, companyId, nowStr);
         const docId = docRes.lastInsertRowid;
 
-        // Salvar fragmentos em knowledge_chunks
+        // Salvar fragmentos em knowledge_chunks com contexto estruturado para IA
         const insChunk = db.prepare(`
             INSERT INTO knowledge_chunks (doc_id, chunk_index, content, metadata, company_id, created_at)
             VALUES (?, ?, ?, ?, ?, ?)
         `);
 
         for (let i = 0; i < chunks.length; i++) {
-            insChunk.run(docId, i + 1, chunks[i].content, chunks[i].metadata, companyId, nowStr);
+            const rawChunkContent = chunks[i].content;
+            // Estrutura contextual para evitar alucinações da IA na recuperação
+            const structuredChunkContent = `[BASE DE CONHECIMENTO: ${title} | CATEGORIA: ${sCategory} | PARTE ${i + 1}/${chunkCount}]\n${rawChunkContent}`;
+            
+            let chunkMeta = {};
+            try {
+                chunkMeta = chunks[i].metadata ? JSON.parse(chunks[i].metadata) : {};
+            } catch (_) {}
+            chunkMeta.category = sCategory;
+            chunkMeta.summary = aiMetadata.summary;
+            chunkMeta.docType = docType;
+
+            insChunk.run(docId, i + 1, structuredChunkContent, JSON.stringify(chunkMeta), companyId, nowStr);
         }
 
-        addAuditLog(user, 'Indexou Arquivo RAG', `[${docType.toUpperCase()}] ${title} (${chunkCount} fragmentos)`, '🟢');
+        addAuditLog(user, 'Indexou Arquivo RAG', `[${docType.toUpperCase()}] ${title} (${chunkCount} fragmentos | Categoria: ${sCategory})`, '🟢', companyId);
 
         return {
             id: docId,
             title,
             filename,
             type: docType,
+            category: sCategory,
+            summary: aiMetadata.summary,
             file_size: fileSize,
             chunk_count: chunkCount,
             keywords: sKeywords,
@@ -522,6 +622,7 @@ function buildRagPromptContext(query, companyId = 'default') {
 module.exports = {
     upload,
     indexUploadedFile,
+    generateAiMetadata,
     indexManualText,
     updateDocKeywords,
     getKnowledgeDocs,

@@ -58,6 +58,33 @@ server.listen(PORT, async () => {
         assert.strictEqual(resBadToken.status, 401);
         console.log('  ✅ 5. Token forjado/adulterado rejeitado com 401 OK');
 
+        // 6. Testar bloqueio do upload RAG sem autenticação
+        const resRagUnauth = await fetch(`http://localhost:${PORT}/api/rag/upload`, {
+            method: 'POST'
+        });
+        assert.strictEqual(resRagUnauth.status, 401);
+        console.log('  ✅ 6. Upload RAG sem autenticação bloqueado com 401 OK');
+
+        // 7. Testar upload RAG em lote com Bearer Token e geração de metadados
+        const formData = new FormData();
+        const testFile1 = new Blob(['Conteudo de teste do documento 1 para base de conhecimento e vendas corporativas.'], { type: 'text/plain' });
+        const testFile2 = new Blob(['Conteudo de teste do documento 2 com informacoes de precos, suporte e prazos de garantia.'], { type: 'text/plain' });
+        formData.append('files', testFile1, 'doc1_teste.txt');
+        formData.append('files', testFile2, 'doc2_teste.txt');
+
+        const resRagBatch = await fetch(`http://localhost:${PORT}/api/rag/upload`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${dataValidLogin.token}` },
+            body: formData
+        });
+        const dataRagBatch = await resRagBatch.json();
+        assert.strictEqual(resRagBatch.status, 200);
+        assert.strictEqual(dataRagBatch.success, true);
+        assert.strictEqual(dataRagBatch.count, 2);
+        assert(dataRagBatch.docs && dataRagBatch.docs.length === 2);
+        assert(dataRagBatch.docs[0].keywords, 'Deve ter gerado palavras-gatilho');
+        console.log('  ✅ 7. Upload em lote RAG com Bearer Token e geração de gatilhos OK');
+
         server.close(() => {
             console.log('🎉 Todos os testes de integração da API passaram com sucesso!\n');
             process.exit(0);
