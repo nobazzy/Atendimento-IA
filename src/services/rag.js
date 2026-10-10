@@ -106,14 +106,33 @@ function processSpreadsheet(filePath, originalName) {
 }
 
 // ─── PROCESSAMENTO DE DOCUMENTOS (PDF, DOCX, TXT) ───
+async function extractPdfText(dataBuffer) {
+    if (typeof pdfParse === 'function') {
+        const res = await pdfParse(dataBuffer);
+        return res.text || '';
+    }
+    if (pdfParse && pdfParse.PDFParse) {
+        const parser = new pdfParse.PDFParse({ data: dataBuffer });
+        const result = await parser.getText();
+        if (typeof parser.destroy === 'function') {
+            await parser.destroy();
+        }
+        return result.text || '';
+    }
+    if (pdfParse && typeof pdfParse.default === 'function') {
+        const res = await pdfParse.default(dataBuffer);
+        return res.text || '';
+    }
+    throw new Error('Módulo pdf-parse não pôde processar o arquivo PDF.');
+}
+
 async function processDocument(filePath, originalName, ext) {
     try {
         let rawText = '';
 
         if (ext === '.pdf') {
             const dataBuffer = fs.readFileSync(filePath);
-            const pdfData = await pdfParse(dataBuffer);
-            rawText = pdfData.text || '';
+            rawText = await extractPdfText(dataBuffer);
         } else if (ext === '.docx') {
             const result = await mammoth.extractRawText({ path: filePath });
             rawText = result.value || '';
