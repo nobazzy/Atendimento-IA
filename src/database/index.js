@@ -269,6 +269,7 @@ function initDatabase() {
             setCfg.run("active_provider", config.USE_OPENAI ? "openai" : "ollama", nowStr);
             setCfg.run("active_model", config.USE_OPENAI ? config.OPENAI_MODEL : config.OLLAMA_MODEL, nowStr);
             setCfg.run("temperature", "0.7", nowStr);
+            setCfg.run("max_tokens", "2048", nowStr);
             setCfg.run("history_limit", "10", nowStr);
             setCfg.run("business_hours_enabled", "false", nowStr);
             setCfg.run("business_hours_start", "08:00", nowStr);

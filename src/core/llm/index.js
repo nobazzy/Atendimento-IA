@@ -14,7 +14,7 @@ function estimateTokens(text) {
     return Math.ceil(text.length / 4);
 }
 
-async function testPromptPlayground(userPrompt, testMessage, modelOverride, tempOverride) {
+async function testPromptPlayground(userPrompt, testMessage, modelOverride, tempOverride, maxTokensOverride) {
     const startTime = Date.now();
     const temp = parseFloat(tempOverride) || 0.7;
 
@@ -24,7 +24,7 @@ async function testPromptPlayground(userPrompt, testMessage, modelOverride, temp
     ];
 
     try {
-        const reply = await callAIProvider(messages, modelOverride, temp);
+        const reply = await callAIProvider(messages, modelOverride, temp, maxTokensOverride);
         const latencyMs = Date.now() - startTime;
         const tokens = estimateTokens(userPrompt + testMessage + reply);
         const costBrl = (tokens * COST_PER_TOKEN_BRL).toFixed(4);
@@ -46,7 +46,7 @@ async function testPromptPlayground(userPrompt, testMessage, modelOverride, temp
     }
 }
 
-async function callAIProvider(messages, modelOverride = null, tempOverride = null) {
+async function callAIProvider(messages, modelOverride = null, tempOverride = null, maxTokensOverride = null) {
     const startTime = Date.now();
 
     const dbConfig = db.prepare('SELECT key, value FROM system_config').all().reduce((acc, row) => {
@@ -56,6 +56,7 @@ async function callAIProvider(messages, modelOverride = null, tempOverride = nul
 
     const provider = (dbConfig.active_provider || config.ACTIVE_PROVIDER).toLowerCase();
     const temperature = tempOverride !== null ? tempOverride : (parseFloat(dbConfig.temperature) || 0.7);
+    const maxTokens = maxTokensOverride !== null ? maxTokensOverride : (parseInt(dbConfig.max_tokens, 10) || 2048);
     let replyText = '';
 
     try {
@@ -66,8 +67,8 @@ async function callAIProvider(messages, modelOverride = null, tempOverride = nul
 
             const response = await axios.post(
                 'https://api.openai.com/v1/chat/completions',
-                { model, messages, temperature },
-                { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 30000 }
+                { model, messages, temperature, max_tokens: maxTokens },
+                { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 35000 }
             );
             if (response.data && response.data.choices && response.data.choices[0]) {
                 replyText = response.data.choices[0].message.content.trim();
@@ -83,8 +84,11 @@ async function callAIProvider(messages, modelOverride = null, tempOverride = nul
 
             const response = await axios.post(
                 `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-                { contents: [{ parts: [{ text: JSON.stringify(messages) }] }] },
-                { timeout: 30000 }
+                {
+                    contents: [{ parts: [{ text: JSON.stringify(messages) }] }],
+                    generationConfig: { maxOutputTokens: maxTokens, temperature }
+                },
+                { timeout: 35000 }
             );
             if (response.data && response.data.candidates && response.data.candidates[0]) {
                 replyText = response.data.candidates[0].content.parts[0].text.trim();
@@ -101,7 +105,7 @@ async function callAIProvider(messages, modelOverride = null, tempOverride = nul
 
             const response = await axios.post(
                 'https://api.anthropic.com/v1/messages',
-                { model, system: systemMsg, messages: userMsgs, max_tokens: 1024, temperature },
+                { model, system: systemMsg, messages: userMsgs, max_tokens: maxTokens, temperature },
                 { headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' }, timeout: 35000 }
             );
             if (response.data && response.data.content && response.data.content[0]) {
@@ -116,8 +120,8 @@ async function callAIProvider(messages, modelOverride = null, tempOverride = nul
 
             const response = await axios.post(
                 'https://api.groq.com/openai/v1/chat/completions',
-                { model, messages, temperature },
-                { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 20000 }
+                { model, messages, temperature, max_tokens: maxTokens },
+                { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 25000 }
             );
             if (response.data && response.data.choices && response.data.choices[0]) {
                 replyText = response.data.choices[0].message.content.trim();
@@ -131,7 +135,7 @@ async function callAIProvider(messages, modelOverride = null, tempOverride = nul
 
             const response = await axios.post(
                 'https://api.deepseek.com/v1/chat/completions',
-                { model, messages, temperature },
+                { model, messages, temperature, max_tokens: maxTokens },
                 { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 35000 }
             );
             if (response.data && response.data.choices && response.data.choices[0]) {
@@ -143,7 +147,7 @@ async function callAIProvider(messages, modelOverride = null, tempOverride = nul
             const model = modelOverride || dbConfig.active_model || config.LMSTUDIO_MODEL;
             const response = await axios.post(
                 config.LMSTUDIO_URL,
-                { model, messages, temperature },
+                { model, messages, temperature, max_tokens: maxTokens },
                 { timeout: 45000 }
             );
             if (response.data && response.data.choices && response.data.choices[0]) {
@@ -155,7 +159,7 @@ async function callAIProvider(messages, modelOverride = null, tempOverride = nul
             const model = modelOverride || dbConfig.active_model || config.CUSTOM_MODEL;
             const response = await axios.post(
                 config.CUSTOM_API_URL,
-                { model, messages, temperature },
+                { model, messages, temperature, max_tokens: maxTokens },
                 { headers: config.CUSTOM_API_KEY ? { 'Authorization': `Bearer ${config.CUSTOM_API_KEY}` } : {}, timeout: 45000 }
             );
             if (response.data && response.data.choices && response.data.choices[0]) {
@@ -168,7 +172,7 @@ async function callAIProvider(messages, modelOverride = null, tempOverride = nul
             const model = modelOverride || dbConfig.active_model || config.OLLAMA_MODEL;
             const response = await axios.post(
                 config.OLLAMA_URL,
-                { model, messages, stream: false, options: { temperature } },
+                { model, messages, stream: false, options: { temperature, num_predict: maxTokens } },
                 { timeout: 90000 }
             );
             if (response.data && response.data.message) {

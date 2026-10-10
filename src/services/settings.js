@@ -49,6 +49,7 @@ function getAllSettings(companyId = 'default') {
                 provider: configMap.active_provider || 'openai',
                 model: configMap.active_model || 'gpt-4o-mini',
                 temperature: parseFloat(configMap.temperature || '0.7'),
+                max_tokens: parseInt(configMap.max_tokens || '2048', 10),
                 history_limit: parseInt(configMap.history_limit || '10', 10),
                 debounce_seconds: parseFloat(configMap.ai_debounce_seconds || '4.0'),
                 personality: activePersona ? activePersona.id : (configMap.active_personality || 'cloud')
@@ -112,6 +113,12 @@ function saveAllSettings(data, user = 'Admin', companyId = 'default') {
             if (data.ai.provider) setCfg.run('active_provider', sanitizeInput(data.ai.provider), companyId, nowStr);
             if (data.ai.model) setCfg.run('active_model', sanitizeInput(data.ai.model), companyId, nowStr);
             if (data.ai.temperature !== undefined) setCfg.run('temperature', String(data.ai.temperature), companyId, nowStr);
+            if (data.ai.max_tokens !== undefined) {
+                const maxTok = parseInt(data.ai.max_tokens, 10);
+                if (!isNaN(maxTok) && maxTok >= 200 && maxTok <= 16000) {
+                    setCfg.run('max_tokens', String(maxTok), companyId, nowStr);
+                }
+            }
             const histLimit = data.ai.history_limit !== undefined ? data.ai.history_limit : data.ai.historyLimit;
             if (histLimit !== undefined) setCfg.run('history_limit', String(histLimit), companyId, nowStr);
             if (data.ai.debounce_seconds !== undefined) {

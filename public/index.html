@@ -1050,8 +1050,12 @@
                                     <select class="form-control" id="cfg-ai-provider" style="margin-bottom: 0;">
                                         <option value="openai">OpenAI</option>
                                         <option value="gemini">Google Gemini</option>
+                                        <option value="claude">Anthropic Claude</option>
+                                        <option value="groq">Groq (Ultra-Rápido)</option>
+                                        <option value="deepseek">DeepSeek</option>
                                         <option value="ollama">Ollama (Local)</option>
                                         <option value="lmstudio">LM Studio (Local)</option>
+                                        <option value="custom">API Customizada</option>
                                     </select>
                                 </div>
                                 <div style="flex: 1;">
@@ -1062,10 +1066,23 @@
 
                             <div style="display: flex; gap: 0.75rem; margin-bottom: 0.85rem;">
                                 <div style="flex: 1;">
-                                    <label class="form-label" for="cfg-ai-temp">Temperatura (<span id="cfg-temp-val">0.7</span>)</label>
+                                    <label class="form-label" for="cfg-ai-temp">Temperatura Criativa (<span id="cfg-temp-val">0.7</span>)</label>
                                     <input type="range" class="form-control" id="cfg-ai-temp" min="0" max="1" step="0.05" value="0.7" style="padding: 0; margin-bottom: 0; height: 36px;">
                                 </div>
-                                <div style="flex: 1;">
+                                <div style="flex: 1.2;">
+                                    <label class="form-label" for="cfg-ai-max-tokens" style="display:flex; justify-content:space-between; align-items:center;">
+                                        <span>Limite de Tokens de Resposta</span>
+                                        <span id="cfg-max-tokens-val" style="font-size:0.75rem; color:var(--brand-blue); font-weight:600;">2048</span>
+                                    </label>
+                                    <select class="form-control" id="cfg-ai-max-tokens" style="margin-bottom: 0;">
+                                        <option value="800">800 tokens (~550 palavras - Rápido & Direto)</option>
+                                        <option value="1500">1.500 tokens (~1.000 palavras - Padrão WhatsApp)</option>
+                                        <option value="2048" selected>2.048 tokens (~1.500 palavras - Equilibrado / Detalhado)</option>
+                                        <option value="3500">3.500 tokens (~2.500 palavras - Completo / Consultoria)</option>
+                                        <option value="6000">6.000 tokens (~4.500 palavras - Relatórios & Manuais)</option>
+                                    </select>
+                                </div>
+                                <div style="flex: 0.8;">
                                     <label class="form-label" for="cfg-ai-limit">Histórico (msgs)</label>
                                     <input type="number" class="form-control" id="cfg-ai-limit" min="2" max="50" value="10" style="margin-bottom: 0;">
                                 </div>

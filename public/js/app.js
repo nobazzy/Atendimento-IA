@@ -1624,6 +1624,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const maxTokensSelect = document.getElementById('cfg-ai-max-tokens');
+    const maxTokensValLabel = document.getElementById('cfg-max-tokens-val');
+    if (maxTokensSelect && maxTokensValLabel) {
+        maxTokensSelect.addEventListener('change', () => {
+            maxTokensValLabel.innerText = maxTokensSelect.value;
+        });
+    }
+
     const btnSaveTop = document.getElementById('btn-save-settings-top');
     if (btnSaveTop) {
         btnSaveTop.addEventListener('click', () => {
@@ -1960,6 +1968,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 aiTemp.value = ai.temperature !== undefined ? ai.temperature : 0.7;
                 if (tempValLabel) tempValLabel.innerText = aiTemp.value;
             }
+            const aiMaxTokens = document.getElementById('cfg-ai-max-tokens');
+            if (aiMaxTokens) {
+                aiMaxTokens.value = String(ai.max_tokens || 2048);
+                if (maxTokensValLabel) maxTokensValLabel.innerText = aiMaxTokens.value;
+            }
             if (aiLimit) aiLimit.value = ai.history_limit || 10;
             const aiDebounce = document.getElementById('cfg-ai-debounce');
             if (aiDebounce) aiDebounce.value = ai.debounce_seconds !== undefined ? ai.debounce_seconds : 4.0;
@@ -2064,6 +2077,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     provider: document.getElementById('cfg-ai-provider').value,
                     model: document.getElementById('cfg-ai-model').value.trim(),
                     temperature: parseFloat(document.getElementById('cfg-ai-temp').value) || 0.7,
+                    max_tokens: parseInt(document.getElementById('cfg-ai-max-tokens')?.value, 10) || 2048,
                     history_limit: parseInt(document.getElementById('cfg-ai-limit').value, 10) || 10,
                     debounce_seconds: parseFloat(document.getElementById('cfg-ai-debounce')?.value) || 4.0,
                     personality: chosenAgentId
