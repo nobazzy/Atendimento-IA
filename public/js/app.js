@@ -754,39 +754,89 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    window.previewRagDoc = async function(id) {
-        if (!modalRagPreview) return;
+    let currentPreviewDocId = null;
+    let currentPreviewPage = 1;
+    let currentPreviewSearch = '';
+
+    const btnRagPrevPage = document.getElementById('btn-rag-prev-page');
+    const btnRagNextPage = document.getElementById('btn-rag-next-page');
+    const inputRagPreviewSearch = document.getElementById('rag-preview-search');
+
+    if (btnRagPrevPage) {
+        btnRagPrevPage.addEventListener('click', () => {
+            if (currentPreviewDocId && currentPreviewPage > 1) {
+                loadRagDocPreview(currentPreviewDocId, currentPreviewPage - 1, currentPreviewSearch);
+            }
+        });
+    }
+
+    if (btnRagNextPage) {
+        btnRagNextPage.addEventListener('click', () => {
+            if (currentPreviewDocId) {
+                loadRagDocPreview(currentPreviewDocId, currentPreviewPage + 1, currentPreviewSearch);
+            }
+        });
+    }
+
+    if (inputRagPreviewSearch) {
+        let searchDebounce = null;
+        inputRagPreviewSearch.addEventListener('input', (e) => {
+            clearTimeout(searchDebounce);
+            searchDebounce = setTimeout(() => {
+                if (currentPreviewDocId) {
+                    currentPreviewSearch = e.target.value.trim();
+                    loadRagDocPreview(currentPreviewDocId, 1, currentPreviewSearch);
+                }
+            }, 300);
+        });
+    }
+
+    async function loadRagDocPreview(id, page = 1, searchQuery = '') {
         const titleEl = document.getElementById('rag-preview-title');
         const metaEl = document.getElementById('rag-preview-meta');
         const chunksEl = document.getElementById('rag-preview-chunks');
+        const pageInfoEl = document.getElementById('rag-preview-page-info');
 
-        if (titleEl) titleEl.textContent = 'Carregando blocos...';
-        if (metaEl) metaEl.textContent = '';
-        if (chunksEl) chunksEl.innerHTML = '<div style="text-align:center; padding:2rem; color:var(--text-muted);">Buscando fragmentos...</div>';
+        currentPreviewDocId = id;
+        currentPreviewPage = page;
+        currentPreviewSearch = searchQuery;
 
-        modalRagPreview.classList.add('open');
+        if (chunksEl) chunksEl.innerHTML = '<div style="text-align:center; padding:2rem; color:var(--text-muted);"><i data-lucide="loader" style="width:14px;height:14px;animation:spin 1s linear infinite;display:inline-block;vertical-align:middle;"></i> Carregando blocos...</div>';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
 
         try {
-            const res = await fetch(`/api/rag/docs/${id}/preview`);
+            const url = `/api/rag/docs/${id}/preview?page=${page}&limit=50&q=${encodeURIComponent(searchQuery)}`;
+            const res = await fetch(url);
             const data = await res.json();
             if (data.success && data.doc) {
                 const doc = data.doc;
+                const pagination = data.pagination || { page: 1, limit: 50, total: doc.chunk_count, totalPages: 1 };
+                currentPreviewPage = pagination.page;
+
                 if (titleEl) titleEl.textContent = doc.title;
                 if (metaEl) {
                     const sizeStr = doc.file_size ? ` • ${formatFileSize(doc.file_size)}` : '';
-                    metaEl.textContent = `${doc.chunks.length} blocos indexados • Tipo: ${(doc.type || 'DOC').toUpperCase()}${sizeStr}`;
+                    const searchNotice = searchQuery ? ` correspondentes ao filtro` : '';
+                    metaEl.innerHTML = `<strong>${doc.chunk_count || pagination.total} blocos indexados no total</strong> (Exibindo ${data.chunks.length} nesta página${searchNotice}) • Tipo: ${(doc.type || 'DOC').toUpperCase()}${sizeStr}`;
                 }
+
+                if (pageInfoEl) {
+                    pageInfoEl.textContent = `Pág ${pagination.page} de ${pagination.totalPages}`;
+                }
+                if (btnRagPrevPage) btnRagPrevPage.disabled = pagination.page <= 1;
+                if (btnRagNextPage) btnRagNextPage.disabled = pagination.page >= pagination.totalPages;
+
                 if (chunksEl) {
                     chunksEl.innerHTML = '';
-                    if (doc.chunks.length === 0) {
-                        chunksEl.innerHTML = '<div style="text-align:center; padding:1.5rem; color:var(--text-muted);">Nenhum bloco encontrado neste documento.</div>';
+                    if (!data.chunks || data.chunks.length === 0) {
+                        chunksEl.innerHTML = '<div style="text-align:center; padding:2rem; color:var(--text-muted);">Nenhum bloco encontrado com o filtro atual.</div>';
                     } else {
-                        doc.chunks.forEach((c, idx) => {
+                        data.chunks.forEach((c) => {
                             const chunkCard = document.createElement('div');
                             chunkCard.className = 'rag-chunk-card';
                             chunkCard.innerHTML = `
                                 <div class="rag-chunk-header">
-                                    <span><strong>Bloco #${idx + 1}</strong> (${(c.content || '').length} caracteres)</span>
+                                    <span><strong>Bloco #${c.chunk_index}</strong> (${(c.content || '').length} caracteres)</span>
                                     <span style="font-size:0.72rem; color:var(--text-muted);">ID #${c.id}</span>
                                 </div>
                                 <div class="rag-chunk-content">${escapeHtml(c.content)}</div>
@@ -796,11 +846,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             } else {
-                if (chunksEl) chunksEl.innerHTML = `<div style="color:var(--brand-rose-text); padding:1rem;">Erro ao carregar pré-visualização: ${escapeHtml(data.error || 'Não encontrado')}</div>`;
+                if (chunksEl) chunksEl.innerHTML = `<div style="color:var(--brand-rose-text); padding:1rem;">Erro: ${escapeHtml(data.error || 'Falha ao carregar')}</div>`;
             }
         } catch (e) {
             if (chunksEl) chunksEl.innerHTML = `<div style="color:var(--brand-rose-text); padding:1rem;">Falha de rede: ${escapeHtml(e.message)}</div>`;
         }
+    }
+
+    window.previewRagDoc = async function(id) {
+        if (!modalRagPreview) return;
+        modalRagPreview.classList.add('open');
+        if (inputRagPreviewSearch) inputRagPreviewSearch.value = '';
+        currentPreviewSearch = '';
+        await loadRagDocPreview(id, 1, '');
     };
 
     window.deleteRagDoc = async function(id) {

@@ -462,18 +462,42 @@ function getKnowledgeDocs(companyId = 'default') {
     }
 }
 
-// ─── PRÉ-VISUALIZAÇÃO DE DOCUMENTO COM VALIDAÇÃO DE POSSE ───
-function getDocPreview(docId, companyId = 'default', limit = 8) {
+// ─── PRÉ-VISUALIZAÇÃO DE DOCUMENTO COM VALIDAÇÃO DE POSSE & PAGINAÇÃO ───
+function getDocPreview(docId, companyId = 'default', page = 1, limit = 50, search = '') {
     try {
-        const doc = db.prepare('SELECT id, title, type, chunk_count, keywords, company_id FROM knowledge_docs WHERE id = ?').get(docId);
+        const doc = db.prepare('SELECT id, title, type, chunk_count, file_size, keywords, company_id FROM knowledge_docs WHERE id = ?').get(docId);
         if (!doc) return null;
         if (companyId && doc.company_id !== companyId) {
             console.warn(`⛔ [RAG SECURITY] Tenant ${companyId} tentou visualizar doc #${docId} da empresa ${doc.company_id}`);
             return null;
         }
 
-        const chunks = db.prepare('SELECT chunk_index, content, metadata FROM knowledge_chunks WHERE doc_id = ? ORDER BY chunk_index ASC LIMIT ?').all(docId, limit);
-        return { doc, chunks };
+        const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+        const safePage = Math.max(parseInt(page, 10) || 1, 1);
+        const offset = (safePage - 1) * safeLimit;
+
+        let totalMatching = doc.chunk_count;
+        let chunks = [];
+
+        if (search && String(search).trim()) {
+            const pattern = `%${String(search).trim()}%`;
+            const countRow = db.prepare('SELECT COUNT(*) as cnt FROM knowledge_chunks WHERE doc_id = ? AND content LIKE ?').get(docId, pattern);
+            totalMatching = countRow ? countRow.cnt : 0;
+            chunks = db.prepare('SELECT id, chunk_index, content, metadata FROM knowledge_chunks WHERE doc_id = ? AND content LIKE ? ORDER BY chunk_index ASC LIMIT ? OFFSET ?').all(docId, pattern, safeLimit, offset);
+        } else {
+            chunks = db.prepare('SELECT id, chunk_index, content, metadata FROM knowledge_chunks WHERE doc_id = ? ORDER BY chunk_index ASC LIMIT ? OFFSET ?').all(docId, safeLimit, offset);
+        }
+
+        return {
+            doc,
+            chunks,
+            pagination: {
+                page: safePage,
+                limit: safeLimit,
+                total: totalMatching,
+                totalPages: Math.max(Math.ceil(totalMatching / safeLimit), 1)
+            }
+        };
     } catch (e) {
         console.error('⚠️ Erro ao buscar preview do documento:', e.message);
         return null;

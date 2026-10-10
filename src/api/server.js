@@ -290,12 +290,16 @@ function createServer() {
 
     app.get('/api/rag/docs/:id/preview', (req, res) => {
         const companyId = req.companyId || 'default';
-        const preview = getRagDocPreview(req.params.id, companyId);
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 50;
+        const search = req.query.q || '';
+        const preview = getRagDocPreview(req.params.id, companyId, page, limit, search);
         if (!preview) return res.status(404).json({ success: false, error: 'Documento não encontrado' });
         res.json({ 
             success: true, 
             doc: { ...preview.doc, chunks: preview.chunks }, 
             chunks: preview.chunks, 
+            pagination: preview.pagination,
             preview 
         });
     });

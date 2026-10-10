@@ -1252,7 +1252,16 @@
                 </div>
                 <button type="button" class="btn btn-secondary btn-sm" id="btn-close-rag-preview" style="padding: 0.2rem 0.5rem;">✕</button>
             </div>
-            <div id="rag-preview-meta" style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.85rem;"></div>
+            <div id="rag-preview-meta" style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.5rem;"></div>
+            <!-- Barra de Busca & Paginação de Blocos -->
+            <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem; background: var(--bg-surface-elevated, #f8fafc); padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0);">
+                <input type="text" id="rag-preview-search" class="form-control" placeholder="Filtrar por palavra dentro dos blocos..." style="margin-bottom: 0; font-size: 0.8rem; height: 32px; flex: 1;">
+                <div style="display: flex; gap: 0.35rem; align-items: center; font-size: 0.78rem;">
+                    <button type="button" class="btn btn-secondary btn-sm" id="btn-rag-prev-page" style="padding: 0.2rem 0.6rem;" title="Página Anterior">◀</button>
+                    <span id="rag-preview-page-info" style="color: var(--text-muted); white-space: nowrap; font-weight: 500;">Pág 1/1</span>
+                    <button type="button" class="btn btn-secondary btn-sm" id="btn-rag-next-page" style="padding: 0.2rem 0.6rem;" title="Próxima Página">▶</button>
+                </div>
+            </div>
             <div id="rag-preview-chunks" style="overflow-y: auto; flex: 1; padding-right: 4px; display: flex; flex-direction: column; gap: 0.65rem;"></div>
         </div>
     </div>
