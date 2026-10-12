@@ -1,6 +1,8 @@
 const axios = require('axios');
 const config = require('../../config');
 const { db } = require('../../database');
+const { buildRagPromptContext } = require('../../services/rag');
+const { getFormattedTrainingContext } = require('../../services/training');
 
 const COST_PER_TOKEN_BRL = 0.0000045; 
 
@@ -18,15 +20,23 @@ async function testPromptPlayground(userPrompt, testMessage, modelOverride, temp
     const startTime = Date.now();
     const temp = parseFloat(tempOverride) || 0.7;
 
+    let enrichedSystemPrompt = userPrompt || '';
+    try {
+        const trainingCtx = getFormattedTrainingContext();
+        const ragCtx = buildRagPromptContext(testMessage || '');
+        if (trainingCtx) enrichedSystemPrompt += '\n' + trainingCtx;
+        if (ragCtx) enrichedSystemPrompt += '\n' + ragCtx;
+    } catch (e) {}
+
     const messages = [
-        { role: 'system', content: userPrompt },
+        { role: 'system', content: enrichedSystemPrompt },
         { role: 'user', content: testMessage }
     ];
 
     try {
         const reply = await callAIProvider(messages, modelOverride, temp, maxTokensOverride);
         const latencyMs = Date.now() - startTime;
-        const tokens = estimateTokens(userPrompt + testMessage + reply);
+        const tokens = estimateTokens(enrichedSystemPrompt + testMessage + reply);
         const costBrl = (tokens * COST_PER_TOKEN_BRL).toFixed(4);
 
         return {

@@ -1155,13 +1155,13 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
 
                 if (lower === '!pausar' || lower === '!admin pausar' || lower === '!ia pausar' || lower === '!admin pausar') {
                     setGlobalPaused(true);
-                    await sendBotMessage(currentChatJid, '⏸️ *CLOUD PAUSADA (MODO SILENCIOSO)*');
+                    await sendBotMessage(currentChatJid, '⏸️ *CLOUD PAUSADA (MODO SILENCIOSO ATIVO)*\n• A IA não responderá mensagens automáticas (nem de clientes, nem suas anotações pessoais neste chat).\n• Comandos iniciados com `!` (como `!retomar`, `!status`, `!nobazzy`) continuam funcionando normalmente.');
                     return;
                 }
 
                 if (lower === '!retomar' || lower === '!admin retomar' || lower === '!ia retomar' || lower === '!admin retomar') {
                     setGlobalPaused(false);
-                    await sendBotMessage(currentChatJid, '▶️ *CLOUD REATIVADA COM SUCESSO!*');
+                    await sendBotMessage(currentChatJid, '▶️ *CLOUD REATIVADA COM SUCESSO!*\n• Atendimento automático e respostas no chat "Você" restaurados.');
                     return;
                 }
 
@@ -1196,6 +1196,12 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
             }
 
             // C) MENSAGENS NORMAIS ENVIADAS PELO ADMINISTRADOR PARA SI MESMO (CHAT "VOCÊ" / isSelf === true)
+            // Se a IA estiver pausada (!pausar), ignora mensagens normais no chat "Você" para permitir anotações pessoais sem interrupção!
+            if (globalPaused) {
+                console.log(`⏸️ [PAUSADO] Anotação/mensagem no Chat Você ignorada pela IA (Modo Silencioso): "${body.substring(0, 40)}"`);
+                return;
+            }
+
             // QUANDO O ADMINISTRADOR ENVIA MENSAGEM NO PRÓPRIO CHAT ("VOCÊ"), A IA RESPONDE AO ADMINISTRADOR!
             console.log(`💬 [MENSAGEM ADMINISTRADOR -> CHAT VOCÊ]: "${body}"`);
             broadcastLog('chat', 'Mensagem do Administrador no Chat Você', `Para [Administrador]: "${body.substring(0, 40)}..."`, '🟢');
@@ -1203,8 +1209,12 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
 
             const historyRows = db.prepare('SELECT sender, message FROM chat_history WHERE chat_id = ? ORDER BY id DESC LIMIT 10').all(currentChatJid).reverse();
 
+            // Combina a última mensagem de usuário com a atual para enriquecer a busca RAG em perguntas de continuação
+            const recentUserMsgs = historyRows.filter(r => r.sender === 'user').slice(-2).map(r => r.message).join(' ');
+            const ragSearchQuery = recentUserMsgs || body;
+
             let promptMessages = [
-                { role: 'system', content: buildSystemPrompt(true, 'Admin', {}, body) }
+                { role: 'system', content: buildSystemPrompt(true, 'Admin', {}, ragSearchQuery) }
             ];
 
             historyRows.forEach(row => {
@@ -1381,11 +1391,13 @@ async function processConsolidatedAiReply(customerJid, lastMsgObj, bufferedMessa
             'SELECT sender, message FROM chat_history WHERE chat_id = ? ORDER BY id DESC LIMIT ?'
         ).all(customerJid, historyLimit).reverse();
 
-        // Une as mensagens do lote atual para consulta de RAG e prompt do sistema
+        // Une as mensagens do lote atual (e a pergunta anterior se for continuação) para consulta de RAG e prompt do sistema
         const consolidatedQuery = bufferedMessages.join('\n');
+        const recentCustomerMsgs = historyRows.filter(r => r.sender === 'user').slice(-2).map(r => r.message).join(' ');
+        const ragCustomerQuery = `${consolidatedQuery} ${recentCustomerMsgs}`.trim();
 
         let promptMessages = [
-            { role: 'system', content: buildSystemPrompt(false, customerJid.replace('@c.us', ''), {}, consolidatedQuery) }
+            { role: 'system', content: buildSystemPrompt(false, customerJid.replace('@c.us', ''), {}, ragCustomerQuery) }
         ];
 
         historyRows.forEach(row => {

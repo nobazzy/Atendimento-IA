@@ -150,7 +150,7 @@ function getFormattedTrainingContext() {
     try {
         const faqs = db.prepare('SELECT question, answer FROM faqs WHERE active = 1').all();
         const rules = db.prepare('SELECT rule FROM training_rules WHERE active = 1').all();
-        const docs = db.prepare('SELECT title, content FROM knowledge_docs WHERE active = 1 LIMIT 5').all();
+        const docs = db.prepare('SELECT title, type, chunk_count, keywords, content FROM knowledge_docs WHERE active = 1 ORDER BY id DESC LIMIT 30').all();
 
         let context = '';
 
@@ -169,9 +169,12 @@ function getFormattedTrainingContext() {
         }
 
         if (docs.length > 0) {
-            context += '\n[DOCUMENTOS E MANUAIS RAG INDEXADOS]\n';
+            context += '\n[CATÁLOGO DE DOCUMENTOS E BASES RAG DISPONÍVEIS]\n';
+            context += '(Os trechos detalhados e literais relevantes para a pergunta atual serão injetados na seção [INFORMAÇÕES OFICIAIS RECUPERADAS DA BASE DE CONHECIMENTO] abaixo):\n';
             docs.forEach(d => {
-                context += `📄 DOCUMENTO (${d.title}): ${d.content.substring(0, 1500)}\n`;
+                const kwInfo = d.keywords ? ` | Gatilhos: ${d.keywords}` : '';
+                const summaryPreview = (d.content || '').replace(/\s+/g, ' ').substring(0, 350);
+                context += `📄 DOCUMENTO "${d.title}" (${d.type || 'Texto'}, ${d.chunk_count || 1} bloco(s)${kwInfo}): ${summaryPreview}\n`;
             });
         }
 

@@ -42,30 +42,33 @@ const upload = multer({
     limits: { fileSize: 25 * 1024 * 1024 } // 25 MB
 });
 
-// Lista de Stopwords em Português para limpeza e scoring de busca
+// Lista de Stopwords Gramaticais em Português (preservando termos de negócio como valor, preço, prazo, etc.)
 const PT_STOPWORDS = new Set([
     'a', 'o', 'as', 'os', 'um', 'uma', 'uns', 'umas', 'de', 'do', 'da', 'dos', 'das',
     'em', 'no', 'na', 'nos', 'nas', 'por', 'pelo', 'pela', 'pelos', 'pelas', 'para',
     'com', 'como', 'que', 'se', 'ou', 'e', 'mas', 'ao', 'aos', 'meu', 'minha', 'seu',
-    'sua', 'voce', 'voces', 'tem', 'qual', 'quanto', 'quantos', 'quantas', 'custa',
-    'valor', 'preco', 'onde', 'quando', 'favor', 'ola', 'bom', 'dia', 'boa', 'tarde',
-    'noite', 'oi', 'opa', 'eh', 'e', 'sao', 'ser', 'esta', 'estao', 'fazer', 'ter'
+    'sua', 'voce', 'voces', 'tem', 'qual', 'quais', 'favor', 'ola', 'bom', 'dia', 'boa',
+    'tarde', 'noite', 'oi', 'opa', 'eh', 'sao', 'ser', 'esta', 'estao', 'fazer', 'ter',
+    'sobre', 'me', 'fale', 'diga', 'quero', 'saber', 'pode', 'poderia'
 ]);
 
 function normalizeString(str) {
     if (!str) return '';
-    return str
+    return String(str)
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
+        // Une números separados por ponto de milhar (ex: 14.133 -> 14133) para casar tanto com 14.133 quanto 14133
+        .replace(/(\d)\.(\d{3})\b/g, '$1$2')
         .toLowerCase();
 }
 
 function extractKeywords(text) {
     const normalized = normalizeString(text);
-    return normalized
+    const tokens = normalized
         .split(/[^a-z0-9_]+/)
         .map(t => t.trim())
-        .filter(t => t.length >= 2 && !PT_STOPWORDS.has(t));
+        .filter(t => (t.length >= 2 || /^\d+$/.test(t)) && !PT_STOPWORDS.has(t));
+    return Array.from(new Set(tokens));
 }
 
 // ─── PROCESSAMENTO DE PLANILHAS (XLSX, XLS, CSV) ───
@@ -532,15 +535,17 @@ function deleteKnowledgeDoc(id, user = 'Admin', companyId = 'default') {
     }
 }
 
-// ─── RECUPERADOR DE RELEVÂNCIA RAG (ESTRITAMENTE ISOLADO POR TENANT) ───
-function retrieveRelevantChunks(query, companyId = 'default', limit = 4) {
+// ─── RECUPERADOR DE RELEVÂNCIA RAG (TF-IDF + FRASES EXATAS + ISOLAMENTO POR TENANT) ───
+function retrieveRelevantChunks(query, companyId = 'default', limit = 6) {
     try {
-        if (!query || typeof query !== 'string' || query.trim().length < 3) {
+        if (!query || typeof query !== 'string' || query.trim().length < 2) {
             return [];
         }
 
         const keywords = extractKeywords(query);
         if (keywords.length === 0) return [];
+
+        const normQuery = normalizeString(query);
 
         // Busca fragmentos estritamente isolados da empresa requisitante
         const chunks = db.prepare(`
@@ -552,60 +557,124 @@ function retrieveRelevantChunks(query, companyId = 'default', limit = 4) {
 
         if (chunks.length === 0) return [];
 
+        // 1. Extrair corpo limpo (sem cabeçalhos sintéticos) para evitar que todos os blocos do mesmo arquivo empatem
+        const preparedChunks = chunks.map(chunk => {
+            const cleanBody = chunk.content
+                .replace(/^\[BASE DE CONHECIMENTO:[^\]]*\]\s*/i, '')
+                .replace(/^\[DOCUMENTO:[^\]]*\]\s*/i, '');
+            return {
+                ...chunk,
+                normBody: normalizeString(cleanBody),
+                normTitle: normalizeString(chunk.title || '')
+            };
+        });
+
+        // 2. Calcular IDF (Inverse Document Frequency) para valorizar palavras específicas/raras sobre termos genéricos
+        const totalChunks = preparedChunks.length;
+        const idfMap = {};
+        keywords.forEach(kw => {
+            let df = 0;
+            for (let i = 0; i < totalChunks; i++) {
+                if (preparedChunks[i].normBody.includes(kw)) df++;
+            }
+            const baseIdf = Math.max(1.0, Math.log(1 + (totalChunks / (1 + df))));
+            // Números (ex: artigos de lei, números de leis, valores) ganham peso extra de especificidade
+            idfMap[kw] = /^\d+$/.test(kw) ? baseIdf * 1.5 : baseIdf;
+        });
+
+        // 3. Gerar pares de termos consecutivos (bigramas) para bônus de frase/expressão
+        const bigrams = [];
+        for (let i = 0; i < keywords.length - 1; i++) {
+            bigrams.push(`${keywords[i]} ${keywords[i + 1]}`);
+        }
+
         const scored = [];
 
-        chunks.forEach(chunk => {
-            const normContent = normalizeString(chunk.content);
-            let score = 0;
-            let matchedKeywords = 0;
+        preparedChunks.forEach(chunk => {
+            const normBody = chunk.normBody;
+            let bodyScore = 0;
+            let bodyMatchedKeywords = 0;
 
             keywords.forEach(kw => {
-                // Frequência do termo
-                const regex = new RegExp(`\\b${kw}`, 'g');
-                const matches = normContent.match(regex);
-                if (matches) {
-                    score += matches.length * 1.5;
-                    matchedKeywords++;
-                } else if (normContent.includes(kw)) {
-                    score += 0.8;
-                    matchedKeywords++;
+                const idf = idfMap[kw] || 1.0;
+                const exactRegex = new RegExp(`\\b${kw}\\b`, 'g');
+                const prefixRegex = new RegExp(`\\b${kw}`, 'g');
+
+                const exactMatches = normBody.match(exactRegex);
+                if (exactMatches) {
+                    // Saturação logarítmica tipo BM25 (evita spam de uma única palavra repetida)
+                    const tf = Math.min(exactMatches.length, 6);
+                    bodyScore += (1.8 + Math.log(1 + tf)) * idf;
+                    bodyMatchedKeywords++;
+                } else {
+                    const prefixMatches = normBody.match(prefixRegex);
+                    if (prefixMatches) {
+                        bodyScore += 1.4 * idf;
+                        bodyMatchedKeywords++;
+                    } else if (kw.length >= 4 && normBody.includes(kw)) {
+                        bodyScore += 0.7 * idf;
+                        bodyMatchedKeywords++;
+                    }
                 }
             });
 
-            // Bônus se mais de metade das palavras-chave estiverem presentes no mesmo fragmento
-            if (matchedKeywords > 1) {
-                score += matchedKeywords * 2.0;
+            // Bônus forte quando múltiplos termos distintos da pergunta aparecem juntos no mesmo bloco
+            if (bodyMatchedKeywords > 1) {
+                bodyScore += Math.pow(bodyMatchedKeywords, 1.8) * 3.2;
             }
 
-            // Bônus para planilhas que casam termos exatos
-            if (chunk.type === 'xlsx' || chunk.type === 'csv') {
-                score *= 1.25;
-            }
+            // Bônus de frase / expressão contígua no corpo do bloco
+            bigrams.forEach(bg => {
+                if (normBody.includes(bg)) {
+                    bodyScore += 8.5;
+                }
+            });
 
-            // Bônus de Palavras-Gatilho / Tags de Ativação do Documento
+            // Bônus de Título do Documento e Palavras-Gatilho (Tags)
+            let docMetaMatches = 0;
+            keywords.forEach(kw => {
+                if (chunk.normTitle.includes(kw)) docMetaMatches++;
+            });
+
             if (chunk.keywords && typeof chunk.keywords === 'string') {
                 const triggerWords = chunk.keywords.split(',').map(k => normalizeString(k.trim())).filter(Boolean);
-                const normQuery = normalizeString(query);
-                let triggerMatches = 0;
                 triggerWords.forEach(tw => {
                     if (tw.length >= 2 && (normQuery.includes(tw) || keywords.includes(tw))) {
-                        triggerMatches++;
+                        docMetaMatches += 1.5;
                     }
                 });
-                if (triggerMatches > 0) {
-                    score += triggerMatches * 7.5 + 4.0;
-                }
             }
 
-            if (score > 1.2) {
+            let totalScore = bodyScore;
+            if (bodyMatchedKeywords > 0 && docMetaMatches > 0) {
+                // Impulsiona blocos que têm conteúdo real E pertencem ao documento certo
+                totalScore += docMetaMatches * 4.5;
+            } else if (bodyMatchedKeywords === 0 && docMetaMatches > 0 && chunk.chunk_index <= 3) {
+                // Fallback leve apenas para os 3 primeiros blocos se o usuário perguntou apenas pelo nome/tema geral do arquivo
+                totalScore += docMetaMatches * 1.8;
+            }
+
+            // Bônus para planilhas que casam termos reais no registro
+            if ((chunk.type === 'xlsx' || chunk.type === 'xls' || chunk.type === 'csv') && bodyMatchedKeywords > 0) {
+                totalScore *= 1.3;
+            }
+
+            // Penalidade severa para páginas de Sumário / Índice pontilhado (ex: "Capítulo I ......... 25")
+            if (/\.{5,}/.test(chunk.content)) {
+                totalScore *= 0.25;
+            }
+
+            if (totalScore > 1.5) {
                 scored.push({
                     id: chunk.id,
                     docId: chunk.doc_id,
                     docTitle: chunk.title,
+                    doc_title: chunk.title,
+                    chunkIndex: chunk.chunk_index,
                     type: chunk.type,
                     content: chunk.content,
                     keywords: chunk.keywords || '',
-                    score: Math.round(score * 100) / 100
+                    score: Math.round(totalScore * 100) / 100
                 });
             }
         });
@@ -622,19 +691,23 @@ function retrieveRelevantChunks(query, companyId = 'default', limit = 4) {
 // ─── GERADOR DE CONTEXTO RAG PARA INJEÇÃO NO PROMPT ───
 function buildRagPromptContext(query, companyId = 'default') {
     try {
-        const relevantChunks = retrieveRelevantChunks(query, companyId, 4);
+        const relevantChunks = retrieveRelevantChunks(query, companyId, 6);
         if (!relevantChunks || relevantChunks.length === 0) return '';
 
-        let context = '\n[INFORMAÇÕES OFICIAIS RECUPERADAS DA BASE DE CONHECIMENTO / PLANILHAS DO SEU NEGÓCIO]\n';
-        context += 'Utilize com prioridade absoluta os dados abaixo para responder com precisão cirúrgica à dúvida do cliente:\n';
+        let context = '\n[INFORMAÇÕES OFICIAIS RECUPERADAS DA BASE DE CONHECIMENTO / DOCUMENTOS / PLANILHAS]\n';
+        context += 'ATENÇÃO: Os trechos abaixo foram extraídos diretamente dos documentos oficiais cadastrados no sistema.\n';
+        context += 'Utilize com PRIORIDADE ABSOLUTA estes dados para responder com precisão cirúrgica:\n';
         context += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
 
         relevantChunks.forEach((c, idx) => {
-            context += `• INFORMAÇÃO #${idx + 1} (${c.docTitle} [${c.type.toUpperCase()}]):\n${c.content}\n\n`;
+            context += `📌 TRECHO OFICIAL #${idx + 1} (Fonte: ${c.docTitle} | Bloco #${c.chunkIndex || 1} | Relevância: ${c.score}):\n${c.content}\n\n`;
         });
 
         context += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
-        context += 'Instrução: Se a resposta contiver valores, serviços, procedimentos ou regras presentes nos dados acima, cite-os com clareza e fidelidade total.\n';
+        context += 'DIRETRIZ OBRIGATÓRIA DE USO DO RAG:\n';
+        context += '1. Baseie sua resposta fielmente nos fatos, artigos, valores, serviços e regras contidos nos TRECHOS OFICIAIS acima.\n';
+        context += '2. Cite os dados específicos (números, cláusulas, preços, prazos) presentes nos trechos recuperados.\n';
+        context += '3. NUNCA diga que não tem acesso ao documento se o trecho relevante estiver listado acima.\n';
 
         return context;
     } catch (e) {
