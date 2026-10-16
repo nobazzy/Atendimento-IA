@@ -1243,7 +1243,7 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
 
             // C) MENSAGENS NORMAIS ENVIADAS PELO ADMINISTRADOR PARA SI MESMO (CHAT "VOCÊ" / isSelf === true)
             // Se a IA estiver pausada (!pausar), ignora mensagens normais no chat "Você" para permitir anotações pessoais sem interrupção!
-            if (globalPaused) {
+            if (globalIsPaused) {
                 console.log(`⏸️ [PAUSADO] Anotação/mensagem no Chat Você ignorada pela IA (Modo Silencioso): "${body.substring(0, 40)}"`);
                 return;
             }
