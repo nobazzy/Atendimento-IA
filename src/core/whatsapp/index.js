@@ -6,7 +6,7 @@ const path = require('path');
 const config = require('../../config');
 const { db, isMessageProcessed, markMessageProcessed, cleanupOldProcessedMessages } = require('../../database');
 const { broadcastLog } = require('../../services/logs');
-const { getActivePersonalityPrompt } = require('../../services/prompts');
+const { getActivePersonalityPrompt, setActivePersonality } = require('../../services/prompts');
 const { getFormattedTrainingContext, getKnowledgeDocs } = require('../../services/training');
 const { getAllContacts, getBlockedContacts, isContactBlocked, blockContact, unblockContact, saveContact, cleanUnsavedSyncedContacts, isManualOverrideActive, saveLidMapping, resolveContactDisplay } = require('../../services/contacts');
 const { getProfileData, setProfileValue, getMemories, addMemory } = require('../../services/memories');
@@ -462,7 +462,27 @@ function getHelpMenuText() {
 • \`!status\` ➔ Ver status da IA e estatísticas
 • \`!limpar\` ➔ Apagar histórico desta conversa no SQLite
 • \`!admin rag\` ➔ Listar documentos RAG indexados
-• \`!admin templates\` ➔ Listar templates de prompts por nicho`;
+• \`!admin templates\` ➔ Listar templates de prompts por nicho
+
+🎭 *PERFIS & PERSONAS DA IA*
+• \`!agentes\` ➔ Listar perfis disponíveis e ver qual está ativo
+• \`!agente <id>\` ➔ Trocar de perfil na hora (ex: \`!agente rag_estrito\` ou \`!agente cloud\`)`;
+}
+
+function getAgentesListText() {
+    try {
+        const list = db.prepare('SELECT id, name, description, active FROM personalities ORDER BY created_at ASC').all();
+        let txt = `🎭 *PERFIS E AGENTES DA IA CADASTRADOS (${list.length})*\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        list.forEach(a => {
+            const status = a.active ? '🟢 [ATIVO AGORA]' : '⚪';
+            txt += `${status} *${a.name}*\n  • ID: \`${a.id}\`\n  • ${a.description || 'Sem descrição'}\n\n`;
+        });
+        txt += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        txt += `👉 Para trocar o perfil ativo agora, envie:\n\`!agente <id>\`\n*(ex: \`!agente rag_estrito\` para ativar o atendimento estrito ou \`!agente cloud\` para o padrão)*`;
+        return txt;
+    } catch (e) {
+        return '⚠️ Erro ao listar perfis de agentes.';
+    }
 }
 
 function getProfileText() {
@@ -1189,6 +1209,32 @@ async function handleIncomingOrCreatedMessage(msg, eventType = 'message') {
 
                 if (lower === '!admin templates' || lower === '!ia templates' || lower === '!admin templates' || lower === '!templates') {
                     await sendBotMessage(currentChatJid, getTemplatesText());
+                    return;
+                }
+
+                if (lower === '!admin agentes' || lower === '!ia agentes' || lower === '!agentes' || lower === '!perfis' || lower === '!admin perfis') {
+                    await sendBotMessage(currentChatJid, getAgentesListText());
+                    return;
+                }
+
+                if (lower.startsWith('!admin agente ') || lower.startsWith('!ia agente ') || lower.startsWith('!agente ') || lower.startsWith('!perfil ativar ') || lower.startsWith('!admin perfil ativar ')) {
+                    let rawId = '';
+                    if (lower.startsWith('!admin perfil ativar ')) rawId = body.slice(21).trim();
+                    else if (lower.startsWith('!perfil ativar ')) rawId = body.slice(15).trim();
+                    else if (lower.startsWith('!admin agente ')) rawId = body.slice(14).trim();
+                    else if (lower.startsWith('!ia agente ')) rawId = body.slice(11).trim();
+                    else if (lower.startsWith('!agente ')) rawId = body.slice(8).trim();
+
+                    const targetId = rawId.toLowerCase().replace(/[^a-z0-9_]/g, '');
+                    const ok = setActivePersonality(targetId, 'Admin WhatsApp');
+                    if (ok) {
+                        const activated = db.prepare('SELECT name, description FROM personalities WHERE id = ?').get(targetId);
+                        const aName = activated ? activated.name : targetId;
+                        const aDesc = activated && activated.description ? `\n• _${activated.description}_` : '';
+                        await sendBotMessage(currentChatJid, `🎭 *PERFIL DE IA ATIVADO COM SUCESSO!*\n• Agente Ativo: *${aName}*\n• ID: \`${targetId}\`${aDesc}\n\nA IA agora responderá rigorosamente conforme as diretrizes deste perfil.`);
+                    } else {
+                        await sendBotMessage(currentChatJid, `⚠️ *PERFIL NÃO ENCONTRADO!*\n• ID digitado: \`${rawId}\`\n• Envie \`!agentes\` para ver a lista de perfis disponíveis.`);
+                    }
                     return;
                 }
 
