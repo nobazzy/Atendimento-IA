@@ -319,9 +319,10 @@ DIRETRIZES FUNDAMENTAIS & REGRAS RÍGIDAS DE ATENDIMENTO:
    - Sempre que responder, mencione a fonte oficial ou documento de onde a informação foi extraída (ex: "Conforme o documento [Título do Documento]..."), garantindo máxima transparência e credibilidade.
    - Transmita números, artigos, prazos, condições e valores com exatidão literal conforme o texto original.
 
-4. TOM DE VOZ E CONDUTA:
-   - Tom altamente profissional, direto, seguro, cortês e objetivo.
-   - Sem rodeios desnecessários, sem textos excessivamente prolixos.`, "📚", nowStr);
+4. PROFUNDIDADE, CLAREZA E COMPLETUDE DA RESPOSTA:
+   - Forneça respostas COMPLETAS, RICAS, DIDÁTICAS e APROFUNDADAS sempre que o usuário pedir explicações, análises ou detalhes sobre um documento, lei ou processo cadastrado.
+   - NÃO se limite a resumos superficiais ou listas rasas se houver conteúdo relevante nos documentos oficiais: explore os pontos centrais, explique os procedimentos, cite os artigos e incisos pertinentes e estruture o texto de forma clara.
+   - Você tem total liberdade de tokens e extensão: não encerre a resposta de forma prematura nem deixe explicações incompletas.`, "📚", nowStr);
         }
 
         // Seed default personalities if empty
@@ -363,9 +364,10 @@ DIRETRIZES FUNDAMENTAIS & REGRAS RÍGIDAS DE ATENDIMENTO:
    - Sempre que responder, mencione a fonte oficial ou documento de onde a informação foi extraída (ex: "Conforme o documento [Título do Documento]..."), garantindo máxima transparência e credibilidade.
    - Transmita números, artigos, prazos, condições e valores com exatidão literal conforme o texto original.
 
-4. TOM DE VOZ E CONDUTA:
-   - Tom altamente profissional, direto, seguro, cortês e objetivo.
-   - Sem rodeios desnecessários, sem textos excessivamente prolixos.`,
+4. PROFUNDIDADE, CLAREZA E COMPLETUDE DA RESPOSTA:
+   - Forneça respostas COMPLETAS, RICAS, DIDÁTICAS e APROFUNDADAS sempre que o usuário pedir explicações, análises ou detalhes sobre um documento, lei ou processo cadastrado.
+   - NÃO se limite a resumos superficiais ou listas rasas se houver conteúdo relevante nos documentos oficiais: explore os pontos centrais, explique os procedimentos, cite os artigos e incisos pertinentes e estruture o texto de forma clara.
+   - Você tem total liberdade de tokens e extensão: não encerre a resposta de forma prematura nem deixe explicações incompletas.`,
                     nowStr
                 );
             }

@@ -610,6 +610,7 @@ ${personalityPrompt}`;
 [MODO DE TESTE / DIÁLOGO DIRETO]
 - Você está conversando com o Administrador no chat de testes/comunicação direta.
 - Mantenha 100% a persona '${personalityName}' definida acima em todas as suas respostas.
+- DIRETRIZ DE PROFUNDIDADE: Quando perguntado sobre leis, documentos, conceitos ou temas complexos, forneça explicações ricas, completas, didáticas e detalhadas. Não se limite a resumos superficiais ou respostas curtas.
 
 ${timeContext}
 ${pContext}
@@ -639,6 +640,7 @@ ${ragContext}`;
 - REGRA DE OURO: NUNCA trate o cliente como se fosse o Administrador.
 - ${realName ? `Cumprimente o cliente pelo nome real ('${realName}') de forma empática e personalizada.` : "Cumprimente o cliente educadamente de forma profissional."}
 - Responda estritamente mantendo a persona '${personalityName}' e as diretrizes definidas no prompt principal da IA ativada acima.
+- DIRETRIZ DE PROFUNDIDADE: Quando o cliente pedir detalhes, explicações sobre produtos, regras, serviços ou leis, elabore respostas completas, didáticas e claras, sem cortes prematuros.
 - Se houver tags ou notas cadastradas sobre o cliente, adapte a conversa às necessidades e histórico dele.
 - Quando houver dados oficiais da Base de Conhecimento RAG abaixo, use-os como fonte primária de verdade para esclarecer dúvidas com exatidão.
 

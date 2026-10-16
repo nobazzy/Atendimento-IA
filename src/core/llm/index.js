@@ -78,7 +78,7 @@ async function callAIProvider(messages, modelOverride = null, tempOverride = nul
             const response = await axios.post(
                 'https://api.openai.com/v1/chat/completions',
                 { model, messages, temperature, max_tokens: maxTokens },
-                { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 35000 }
+                { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 60000 }
             );
             if (response.data && response.data.choices && response.data.choices[0]) {
                 replyText = response.data.choices[0].message.content.trim();
@@ -98,7 +98,7 @@ async function callAIProvider(messages, modelOverride = null, tempOverride = nul
                     contents: [{ parts: [{ text: JSON.stringify(messages) }] }],
                     generationConfig: { maxOutputTokens: maxTokens, temperature }
                 },
-                { timeout: 35000 }
+                { timeout: 60000 }
             );
             if (response.data && response.data.candidates && response.data.candidates[0]) {
                 replyText = response.data.candidates[0].content.parts[0].text.trim();
@@ -116,7 +116,7 @@ async function callAIProvider(messages, modelOverride = null, tempOverride = nul
             const response = await axios.post(
                 'https://api.anthropic.com/v1/messages',
                 { model, system: systemMsg, messages: userMsgs, max_tokens: maxTokens, temperature },
-                { headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' }, timeout: 35000 }
+                { headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' }, timeout: 60000 }
             );
             if (response.data && response.data.content && response.data.content[0]) {
                 replyText = response.data.content[0].text.trim();
@@ -131,7 +131,7 @@ async function callAIProvider(messages, modelOverride = null, tempOverride = nul
             const response = await axios.post(
                 'https://api.groq.com/openai/v1/chat/completions',
                 { model, messages, temperature, max_tokens: maxTokens },
-                { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 25000 }
+                { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 45000 }
             );
             if (response.data && response.data.choices && response.data.choices[0]) {
                 replyText = response.data.choices[0].message.content.trim();
