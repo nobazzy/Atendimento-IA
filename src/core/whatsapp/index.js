@@ -195,10 +195,48 @@ if (hasSessionSaved && process.env.FRESH_SESSION !== 'true') {
     console.log('📲 [WHATSAPP] Nova sessão limpa! Aguardando geração de QR Code...\n');
 }
 
+// Localiza automaticamente o navegador instalado no sistema operacional (Windows/Linux/Mac)
+function getBrowserExecutablePath() {
+    if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
+        return process.env.PUPPETEER_EXECUTABLE_PATH;
+    }
+
+    const candidatePaths = [
+        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+        path.join(process.env.LOCALAPPDATA || '', 'Google\\Chrome\\Application\\chrome.exe'),
+        'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+        'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+        // Linux / VPS paths
+        '/usr/bin/google-chrome-stable',
+        '/usr/bin/google-chrome',
+        '/usr/bin/chromium-browser',
+        '/usr/bin/chromium',
+        // MacOS
+        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+    ];
+
+    for (const p of candidatePaths) {
+        try {
+            if (p && fs.existsSync(p)) {
+                return p;
+            }
+        } catch (e) {}
+    }
+
+    return undefined;
+}
+
+const browserExecutable = getBrowserExecutablePath();
+if (browserExecutable) {
+    console.log(`🌐 [PUPPETEER] Navegador do sistema localizado: ${browserExecutable}`);
+}
+
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
         headless: config.HEADLESS !== false,
+        executablePath: browserExecutable,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
