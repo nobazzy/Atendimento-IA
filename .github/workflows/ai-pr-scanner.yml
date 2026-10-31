@@ -1,0 +1,50 @@
+name: AI PR Scanner (Generator-Critic)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Número do Pull Request para auditar manualmente'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  models: read
+
+concurrency:
+  group: ai-pr-scanner-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: true
+
+jobs:
+  generator-critic-audit:
+    name: Auditoria & Validação (Agente 1 + Núcleo Determinístico)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run Generator–Critic PR Scanner
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REPO_SLUG: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          BASE_REF: ${{ github.base_ref || 'main' }}
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          MAX_FIX_ATTEMPTS: '2'
+          AUDITOR_MODEL: 'gpt-4o-mini'
+          FIXER_MODEL: 'gpt-4o'
+        run: node .github/scripts/ai-pr-scanner.mjs
