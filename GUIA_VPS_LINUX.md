@@ -110,19 +110,3 @@ Aponte a câmera do seu celular no WhatsApp (**Aparelhos Conectados ➔ Conectar
 | `pm2 status` | Ver status da aplicação, tempo online e uso de memória |
 | `pm2 restart atendimento-ia` | Reiniciar a aplicação |
 | `pm2 stop atendimento-ia` | Pausar o serviço |
-
----
-
-## 🐳 Método Alternativo: Docker Compose
-
-Se preferir rodar com Docker, o `docker-compose.yml` já vem configurado com todos os volumes persistentes:
-
-```bash
-docker compose up -d --build
-```
-
-Volumes montados automaticamente:
-* `./data_auth:/app/.wwebjs_auth` (WhatsApp)
-* `./database.sqlite:/app/database.sqlite` (Banco)
-* `./uploads:/app/uploads` (Documentos RAG)
-* `./backups:/app/backups` (Backups)
