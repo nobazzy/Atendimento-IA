@@ -16,6 +16,26 @@ function estimateTokens(text) {
     return Math.ceil(text.length / 4);
 }
 
+function loadSystemConfigMap() {
+    return db.prepare('SELECT key, value FROM system_config').all().reduce((acc, row) => {
+        acc[row.key] = row.value;
+        return acc;
+    }, {});
+}
+
+function resolveDefaultModel(provider, dbConfig, modelOverride = null) {
+    if (modelOverride) return modelOverride;
+    if (dbConfig && dbConfig.active_model) return dbConfig.active_model;
+    if (provider === 'openai') return config.OPENAI_MODEL;
+    if (provider === 'gemini') return config.GEMINI_MODEL;
+    if (provider === 'claude' || provider === 'anthropic') return config.ANTHROPIC_MODEL;
+    if (provider === 'groq') return config.GROQ_MODEL;
+    if (provider === 'deepseek') return config.DEEPSEEK_MODEL;
+    if (provider === 'lmstudio') return config.LMSTUDIO_MODEL;
+    if (provider === 'custom') return config.CUSTOM_MODEL;
+    return config.OLLAMA_MODEL;
+}
+
 async function testPromptPlayground(userPrompt, testMessage, modelOverride, tempOverride, maxTokensOverride) {
     const startTime = Date.now();
     const temp = parseFloat(tempOverride) || 0.7;
@@ -58,11 +78,7 @@ async function testPromptPlayground(userPrompt, testMessage, modelOverride, temp
 
 async function callAIProvider(messages, modelOverride = null, tempOverride = null, maxTokensOverride = null) {
     const startTime = Date.now();
-
-    const dbConfig = db.prepare('SELECT key, value FROM system_config').all().reduce((acc, row) => {
-        acc[row.key] = row.value;
-        return acc;
-    }, {});
+    const dbConfig = loadSystemConfigMap();
 
     const provider = (dbConfig.active_provider || config.ACTIVE_PROVIDER).toLowerCase();
     const temperature = tempOverride !== null ? tempOverride : (parseFloat(dbConfig.temperature) || 0.7);
@@ -72,7 +88,7 @@ async function callAIProvider(messages, modelOverride = null, tempOverride = nul
     try {
         if (provider === 'openai') {
             const model = modelOverride || dbConfig.active_model || config.OPENAI_MODEL;
-            const apiKey = config.OPENAI_API_KEY;
+            const apiKey = [REDACTED];
             if (!apiKey || apiKey === 'sua_chave_openai_aqui') throw new Error('OPENAI_API_KEY não configurada no .env');
 
             const response = await axios.post(
@@ -89,7 +105,7 @@ async function callAIProvider(messages, modelOverride = null, tempOverride = nul
 
         } else if (provider === 'gemini') {
             const model = modelOverride || dbConfig.active_model || config.GEMINI_MODEL;
-            const apiKey = config.GEMINI_API_KEY || config.OPENAI_API_KEY;
+            const apiKey = [REDACTED] || config.OPENAI_API_KEY;
             if (!apiKey) throw new Error('GEMINI_API_KEY não configurada no .env');
 
             const response = await axios.post(
@@ -107,7 +123,7 @@ async function callAIProvider(messages, modelOverride = null, tempOverride = nul
 
         } else if (provider === 'claude' || provider === 'anthropic') {
             const model = modelOverride || dbConfig.active_model || config.ANTHROPIC_MODEL;
-            const apiKey = config.ANTHROPIC_API_KEY;
+            const apiKey = [REDACTED];
             if (!apiKey) throw new Error('ANTHROPIC_API_KEY não configurada no .env');
 
             const systemMsg = messages.find(m => m.role === 'system') ? messages.find(m => m.role === 'system').content : '';
@@ -125,7 +141,7 @@ async function callAIProvider(messages, modelOverride = null, tempOverride = nul
 
         } else if (provider === 'groq') {
             const model = modelOverride || dbConfig.active_model || config.GROQ_MODEL;
-            const apiKey = config.GROQ_API_KEY;
+            const apiKey = [REDACTED];
             if (!apiKey) throw new Error('GROQ_API_KEY não configurada no .env');
 
             const response = await axios.post(
@@ -140,7 +156,7 @@ async function callAIProvider(messages, modelOverride = null, tempOverride = nul
 
         } else if (provider === 'deepseek') {
             const model = modelOverride || dbConfig.active_model || config.DEEPSEEK_MODEL;
-            const apiKey = config.DEEPSEEK_API_KEY;
+            const apiKey = [REDACTED];
             if (!apiKey) throw new Error('DEEPSEEK_API_KEY não configurada no .env');
 
             const response = await axios.post(
@@ -202,11 +218,7 @@ async function callAIProvider(messages, modelOverride = null, tempOverride = nul
 }
 
 function getLlmTelemetry() {
-    const dbConfig = db.prepare('SELECT key, value FROM system_config').all().reduce((acc, row) => {
-        acc[row.key] = row.value;
-        return acc;
-    }, {});
-
+    const dbConfig = loadSystemConfigMap();
     const provider = (dbConfig.active_provider || config.ACTIVE_PROVIDER).toLowerCase();
 
     return {
@@ -214,15 +226,7 @@ function getLlmTelemetry() {
         totalCostTodayBrl: totalCostTodayBrl.toFixed(2),
         errorsToday,
         lastLatencyMs,
-        activeModel: dbConfig.active_model || (
-            provider === 'openai' ? config.OPENAI_MODEL :
-            provider === 'gemini' ? config.GEMINI_MODEL :
-            provider === 'claude' ? config.ANTHROPIC_MODEL :
-            provider === 'groq' ? config.GROQ_MODEL :
-            provider === 'deepseek' ? config.DEEPSEEK_MODEL :
-            provider === 'lmstudio' ? config.LMSTUDIO_MODEL :
-            provider === 'custom' ? config.CUSTOM_MODEL : config.OLLAMA_MODEL
-        ),
+        activeModel: resolveDefaultModel(provider, dbConfig),
         provider: provider.toUpperCase()
     };
 }
