@@ -17,22 +17,30 @@ function isHumanName(str) {
     return true;
 }
 
-function cleanRawLidContacts() {
-    try {
-        const lidBlocked = db.prepare("SELECT * FROM contacts WHERE (jid LIKE '%@lid' OR jid LIKE '%@bot') AND (auto_reply = 0 OR relationship = 'Bloqueado')").all();
-        lidBlocked.forEach(b => {
-            if (isHumanName(b.name)) {
-                db.prepare("UPDATE contacts SET auto_reply = 0, relationship = 'Bloqueado' WHERE name = ?").run(b.name);
-                const digits = b.jid.replace(/\D/g, '');
-                db.prepare("INSERT INTO blacklist (jid, name, phone_digits, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(jid) DO NOTHING")
-                  .run(b.jid, b.name, digits, new Date().toISOString());
-            }
-        });
-        db.prepare("DELETE FROM contacts WHERE jid LIKE '%@lid' OR jid LIKE '%@bot' OR (length(jid) > 20 AND jid LIKE '27%@c.us')").run();
-        return true;
-    } catch (e) {
-        return false;
+function buildContactIdentityWhere(raw, phoneJid, lidJid, phoneNum) {
+    const whereClauses = [];
+    const whereParams = [];
+    if (raw) {
+        whereClauses.push('jid = ?');
+        whereParams.push(raw);
     }
+    if (phoneJid && phoneJid !== raw) {
+        whereClauses.push("(phone_jid != '' AND phone_jid = ?)");
+        whereParams.push(phoneJid);
+        whereClauses.push('jid = ?');
+        whereParams.push(phoneJid);
+    }
+    if (lidJid && lidJid !== raw) {
+        whereClauses.push("(lid_jid != '' AND lid_jid = ?)");
+        whereParams.push(lidJid);
+        whereClauses.push('jid = ?');
+        whereParams.push(lidJid);
+    }
+    if (phoneNum && phoneNum.length >= 8) {
+        whereClauses.push("(phone_number != '' AND phone_number = ?)");
+        whereParams.push(phoneNum);
+    }
+    return { whereClauses, whereParams };
 }
 
 function getAllContacts() {
@@ -255,29 +263,7 @@ function blockContact(jidOrNumber, name = '', user = 'Admin') {
         if (lidJid && lidJid !== raw) insBl.run(lidJid, contactName, last8, timestamp);
 
         // Atualizar status 1:1 na tabela de contatos APENAS para os identificadores VÁLIDOS do contato
-        const whereClauses = [];
-        const whereParams = [];
-
-        if (raw) {
-            whereClauses.push('jid = ?');
-            whereParams.push(raw);
-        }
-        if (phoneJid && phoneJid !== raw) {
-            whereClauses.push('(phone_jid != \'\' AND phone_jid = ?)');
-            whereParams.push(phoneJid);
-            whereClauses.push('jid = ?');
-            whereParams.push(phoneJid);
-        }
-        if (lidJid && lidJid !== raw) {
-            whereClauses.push('(lid_jid != \'\' AND lid_jid = ?)');
-            whereParams.push(lidJid);
-            whereClauses.push('jid = ?');
-            whereParams.push(lidJid);
-        }
-        if (phoneNum && phoneNum.length >= 8) {
-            whereClauses.push('(phone_number != \'\' AND phone_number = ?)');
-            whereParams.push(phoneNum);
-        }
+        const { whereClauses, whereParams } = buildContactIdentityWhere(raw, phoneJid, lidJid, phoneNum);
 
         if (whereClauses.length > 0) {
             let updateSql = `
@@ -341,29 +327,7 @@ function unblockContact(jidOrNumber, user = 'Admin') {
         db.prepare(`DELETE FROM blacklist WHERE ${blClauses.join(' OR ')}`).run(...blParams);
 
         // 2. Atualizar status na tabela contacts usando apenas identificadores válidos
-        const whereClauses = [];
-        const whereParams = [];
-
-        if (raw) {
-            whereClauses.push('jid = ?');
-            whereParams.push(raw);
-        }
-        if (phoneJid && phoneJid !== raw) {
-            whereClauses.push('(phone_jid != \'\' AND phone_jid = ?)');
-            whereParams.push(phoneJid);
-            whereClauses.push('jid = ?');
-            whereParams.push(phoneJid);
-        }
-        if (lidJid && lidJid !== raw) {
-            whereClauses.push('(lid_jid != \'\' AND lid_jid = ?)');
-            whereParams.push(lidJid);
-            whereClauses.push('jid = ?');
-            whereParams.push(lidJid);
-        }
-        if (phoneNum && phoneNum.length >= 8) {
-            whereClauses.push('(phone_number != \'\' AND phone_number = ?)');
-            whereParams.push(phoneNum);
-        }
+        const { whereClauses, whereParams } = buildContactIdentityWhere(raw, phoneJid, lidJid, phoneNum);
 
         if (whereClauses.length > 0) {
             const updateSql = `
