@@ -588,6 +588,13 @@ function retrieveRelevantChunks(query, companyId = 'default', limit = 6) {
             bigrams.push(`${keywords[i]} ${keywords[i + 1]}`);
         }
 
+        const compiledKeywords = keywords.map(kw => ({
+            kw,
+            idf: idfMap[kw] || 1.0,
+            exactRegex: new RegExp(`\\b${kw}\\b`, 'g'),
+            prefixRegex: new RegExp(`\\b${kw}`, 'g')
+        }));
+
         const scored = [];
 
         preparedChunks.forEach(chunk => {
@@ -595,10 +602,7 @@ function retrieveRelevantChunks(query, companyId = 'default', limit = 6) {
             let bodyScore = 0;
             let bodyMatchedKeywords = 0;
 
-            keywords.forEach(kw => {
-                const idf = idfMap[kw] || 1.0;
-                const exactRegex = new RegExp(`\\b${kw}\\b`, 'g');
-                const prefixRegex = new RegExp(`\\b${kw}`, 'g');
+            compiledKeywords.forEach(({ kw, idf, exactRegex, prefixRegex }) => {
 
                 const exactMatches = normBody.match(exactRegex);
                 if (exactMatches) {
